@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Our Instructors — Department of Air Warfare, AFCSC</title>
+<link rel="icon" href="assets/icons/app.ico" />
+<link rel="stylesheet" href="assets/fonts/fonts.css" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <div class="stage-wrapper" id="stage-wrapper">
+    <div class="stage" id="stage">
+
+      <!-- ============ AMBIENT BACKGROUND: night sky, HUD grid, contrails ============ -->
+      <div class="app-bg" aria-hidden="true">
+        <div class="app-bg-glow"></div>
+        <div class="app-bg-hud"></div>
+        <div class="contrails">
+          <span class="contrail contrail--a"></span>
+          <span class="contrail contrail--b"></span>
+          <span class="contrail contrail--c"></span>
+        </div>
+      </div>
+
+      <!-- ============ PERSISTENT TOP BAR ============ -->
+      <header class="topbar hidden" id="topbar">
+        <div class="topbar-left">
+          <button class="icon-btn" id="btn-home" aria-label="Home">
+            <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5" /><path d="M5.5 10v9a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-9" /><path d="M9.5 20v-6h5v6" /></svg>
+          </button>
+          <button class="topbar-brand" data-nav="home" aria-label="Home">
+            <img class="topbar-crest" src="assets/icons/afcsc.png" alt="Armed Forces Command and Staff College" />
+            <img class="topbar-crest topbar-crest--naf" src="assets/icons/naf.png" alt="Nigerian Air Force" />
+            <span class="topbar-text">
+              <span class="topbar-kicker" data-i18n="appKicker"></span>
+              <span class="topbar-title" data-i18n="appTitle"></span>
+            </span>
+          </button>
+        </div>
+        <div class="topbar-right">
+          <nav class="topbar-nav" id="topbar-nav">
+            <button class="topbar-link" data-nav="staff" data-i18n="navStaff"></button>
+            <button class="topbar-link" data-nav="senior" data-i18n="navSenior"></button>
+            <button class="topbar-link" data-nav="junior" data-i18n="navJunior"></button>
+          </nav>
+          <button class="icon-btn sound-btn hidden" id="btn-sound" aria-label="Mute background music" aria-pressed="false">
+            <svg class="icon-sound-on" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+            <svg class="icon-sound-off" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>
+          </button>
+          <button class="kiosk-close" id="btn-close" title="Close" aria-label="Close">
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main id="screens">
+
+        <!-- ============ WELCOME ============ -->
+        <section class="screen active" id="screen-attract">
+          <div class="horizon" aria-hidden="true"></div>
+
+          <div class="cockpit">
+            <div class="cockpit-text">
+              <div class="cockpit-crests">
+                <img src="assets/icons/afcsc.png" alt="Armed Forces Command and Staff College" />
+                <img class="is-naf" src="assets/icons/naf.png" alt="Nigerian Air Force" />
+              </div>
+              <p class="cockpit-kicker"><span class="cockpit-kicker-bar"></span><span data-i18n="college"></span></p>
+              <h1 class="cockpit-title">
+                <span class="cockpit-title-small" data-i18n="department"></span>
+                <span class="cockpit-title-big" data-i18n="appTitle"></span>
+              </h1>
+              <p class="cockpit-hof" data-i18n="chronicle"></p>
+              <p class="cockpit-tagline" data-i18n="tagline"></p>
+              <div class="gauges" id="attract-stats"></div>
+              <button class="hud-cta" id="attract-cta">
+                <span class="hud-cta-corner hud-cta-corner--tl"></span><span class="hud-cta-corner hud-cta-corner--tr"></span>
+                <span class="hud-cta-corner hud-cta-corner--bl"></span><span class="hud-cta-corner hud-cta-corner--br"></span>
+                <span class="hud-cta-dot"></span>
+                <span data-i18n="touchToBegin"></span>
+                <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+
+            <!-- an airfield movements board, flipping through the roll -->
+            <div class="board" aria-hidden="true">
+              <div class="board-head">
+                <span class="board-title"><span class="board-led"></span><span data-i18n="boardTitle"></span> · <span data-i18n="boardPlace"></span></span>
+                <span class="board-clock" id="board-clock"></span>
+              </div>
+              <div class="board-cols">
+                <span>Tour</span><span>Rank</span><span>Officer</span><span>Branch</span><span>Status</span>
+              </div>
+              <div class="board-rows" id="board-rows"></div>
+              <div class="board-foot" id="board-foot"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ HOME ============ -->
+        <section class="screen" id="screen-home">
+          <div class="home-header">
+            <img class="home-crest" src="assets/icons/afcsc.png" alt="Armed Forces Command and Staff College" />
+            <div class="home-header-text">
+              <p class="eyebrow" data-i18n="appKicker"></p>
+              <h1 class="home-title" data-i18n="appTitle"></h1>
+              <div class="home-rule"><span></span><em data-i18n="chronicle"></em><span></span></div>
+            </div>
+            <img class="home-crest home-crest--naf" src="assets/icons/naf.png" alt="Nigerian Air Force" />
+          </div>
+          <nav class="home-grid">
+            <button class="hall-tile hall-tile--staff" data-nav="staff">
+              <span class="hall-tile-art" id="home-staff-art"></span>
+              <span class="hall-tile-shade"></span>
+              <span class="hall-tile-num">I</span>
+              <span class="hall-tile-body">
+                <span class="hall-tile-meta" id="home-staff-meta"></span>
+                <span class="hall-tile-title" data-i18n="menuStaff"></span>
+                <span class="hall-tile-sub" data-i18n="menuStaffSub"></span>
+              </span>
+              <span class="hall-tile-go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+            </button>
+            <button class="hall-tile hall-tile--chiefs" data-nav="senior">
+              <span class="hall-tile-art" id="home-senior-art"></span>
+              <span class="hall-tile-shade"></span>
+              <span class="hall-tile-num">II</span>
+              <span class="hall-tile-body">
+                <span class="hall-tile-meta" id="home-senior-meta"></span>
+                <span class="hall-tile-title" data-i18n="menuSenior"></span>
+                <span class="hall-tile-sub" data-i18n="menuSeniorSub"></span>
+              </span>
+              <span class="hall-tile-go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+            </button>
+            <button class="hall-tile hall-tile--chiefs" data-nav="junior">
+              <span class="hall-tile-art" id="home-junior-art"></span>
+              <span class="hall-tile-shade"></span>
+              <span class="hall-tile-num">III</span>
+              <span class="hall-tile-body">
+                <span class="hall-tile-meta" id="home-junior-meta"></span>
+                <span class="hall-tile-title" data-i18n="menuJunior"></span>
+                <span class="hall-tile-sub" data-i18n="menuJuniorSub"></span>
+              </span>
+              <span class="hall-tile-go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+            </button>
+          </nav>
+        </section>
+
+        <!-- ============ DIRECTING STAFF ============ -->
+        <section class="screen" id="screen-staff">
+          <div class="list-header">
+            <img class="list-crest list-crest--naf" src="assets/icons/naf.png" alt="" />
+            <div class="list-title">
+              <p class="eyebrow" id="staff-years"></p>
+              <h2 class="section-title" data-i18n="staffTitle"></h2>
+            </div>
+            <div class="chips chips--modes" id="staff-modes"></div>
+          </div>
+
+          <!-- filters for the chosen view -->
+          <div class="staff-filter">
+            <div class="filter-pane" id="pane-year">
+              <div class="ribbon" id="ribbon"></div>
+              <div class="ribbon-bar">
+                <div class="ribbon-pick">
+                  <span class="ribbon-year" id="ribbon-year"></span>
+                  <div class="chips chips--small" id="year-scope"></div>
+                </div>
+                <span class="list-hint" data-i18n="sweepHint"></span>
+              </div>
+            </div>
+            <div class="filter-pane hidden" id="pane-name">
+              <div class="letters" id="letters"></div>
+              <span class="list-hint" data-i18n="letterHint"></span>
+            </div>
+            <div class="filter-pane hidden" id="pane-branch">
+              <div class="branches" id="branches"></div>
+            </div>
+            <div class="filter-pane hidden" id="pane-serving">
+              <p class="serving-line" id="serving-line"></p>
+            </div>
+          </div>
+
+          <div class="track-wrap">
+            <div class="track" id="staff-track"></div>
+          </div>
+        </section>
+
+        <!-- ============ CHIEF INSTRUCTORS: spotlight + flight strips ============ -->
+        <section class="screen" id="screen-chiefs">
+          <div class="ci-layout">
+            <div class="spot">
+              <div class="spot-head">
+                <img class="list-crest" src="assets/icons/afcsc.png" alt="" />
+                <div>
+                  <p class="eyebrow" id="ci-years"></p>
+                  <h2 class="spot-title" id="ci-title"></h2>
+                </div>
+              </div>
+              <div class="spot-card" id="spot-card">
+                <div class="plate" id="plate">
+                  <span class="plate-label" id="plate-label"></span>
+                  <span class="plate-no" id="plate-no"></span>
+                  <span class="plate-board" id="plate-board"></span>
+                  <span class="plate-ordinal" id="plate-ordinal"></span>
+                  <span class="spot-progress"><span id="spot-progress"></span></span>
+                </div>
+                <div class="spot-info" id="spot-info">
+                  <span class="tag" id="spot-tag"></span>
+                  <p class="spot-rank" id="spot-rank"></p>
+                  <h3 class="spot-name" id="spot-name"></h3>
+                  <dl class="spot-facts">
+                    <div><dt data-i18n="tenure"></dt><dd id="spot-tenure"></dd></div>
+                    <div><dt data-i18n="duration"></dt><dd id="spot-duration"></dd></div>
+                  </dl>
+                  <div class="spot-links" id="spot-links"></div>
+                </div>
+              </div>
+              <div class="spot-foot">
+                <span class="spot-count" id="spot-count"></span>
+                <div class="spot-nav">
+                  <button class="round-btn" id="spot-prev" aria-label="Previous Chief Instructor"><svg viewBox="0 0 24 24"><path d="M15 6 9 12l6 6"/></svg></button>
+                  <button class="round-btn" id="spot-next" aria-label="Next Chief Instructor"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+                </div>
+              </div>
+            </div>
+            <div class="strips" id="strips"></div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- ============ RECORD OF ONE OFFICER (Directing Staff) ============ -->
+      <div class="record-overlay hidden" id="record">
+        <div class="record" id="record-card">
+          <button class="record-close" id="record-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+          <aside class="record-aside">
+            <span class="record-label" data-i18n="directingStaff"></span>
+            <span class="record-no" id="record-no"></span>
+            <span class="record-of" id="record-of"></span>
+            <span class="record-board" id="record-board"></span>
+            <span class="record-rank-full" id="record-rank-full"></span>
+          </aside>
+          <div class="record-main">
+            <div class="record-tags" id="record-tags"></div>
+            <h3 class="record-name" id="record-name"></h3>
+            <dl class="record-facts" id="record-facts"></dl>
+            <div class="record-links" id="record-links"></div>
+            <div class="record-intake" id="record-intake"></div>
+          </div>
+          <div class="record-nav">
+            <button class="round-btn" id="record-prev" aria-label="Previous officer"><svg viewBox="0 0 24 24"><path d="M15 6 9 12l6 6"/></svg></button>
+            <button class="round-btn" id="record-next" aria-label="Next officer"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="idle-overlay hidden" id="idle-overlay"><span data-i18n="idleReturnNote"></span></div>
+
+    </div>
+  </div>
+
+  <script src="data/content.js"></script>
+  <script src="data/roll.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
