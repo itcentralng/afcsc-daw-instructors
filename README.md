@@ -10,44 +10,46 @@ own kiosk, *Our Leaders* (`afcsc-leadership`), which this app is designed to
 sit beside.
 
 It is a static, offline web app (no build step, no internet needed) designed
-for a 1920×1080 landscape display and scaled to fit any screen. It follows
-the same pattern as the Our Leaders, Directorate of Procurement, Timbuktu
-Triangle and Air Force History kiosks.
+for a 1920×1080 landscape display and scaled to fit any screen. It shares the
+kiosk conventions of its siblings (launchers, idle reset, music) but has a
+look of its own: a daylight "staff room" of paper and ink, the Air Force slate
+blue and gold lace of the shoulder board, and the national green-white-green,
+where *Our Leaders* is a night-sky cockpit.
 
 ## Screens
 
-- **Welcome**: the title with instrument readouts (Directing Staff, Chief
-  Instructor tours, since, air forces) and a "Touch to begin" target box
-  beside an airfield movements board, the **Staff roll · Jaji**, whose rows
-  flip over one at a time to the next officer on the roll, with a live clock.
-  Any touch begins.
-- **Home**: three sections: The Directing Staff (with a skyline of postings
-  per year), and the Chief Instructors of the Senior and Junior Courses (with
-  their latest flight strips).
-- **The Directing Staff**: all 429 officers as cards (rank braid, initials and
-  surname, specialty, tour, and RAF / GAF / Serving / CI marks), in a track
-  that drifts on its own. Four ways in:
-  - **By year**: a ribbon of every year since 1976; tap or sweep a finger
-    along it. The bright bar is how many joined that year, the faint bar how
-    many were on the staff. Choose *Joined in* or *On the staff in*.
-  - **A – Z**: tap the first letter of a surname.
+- **Welcome**: the title, the College and Air Force crests, and the ranks the
+  Directing Staff held when posted, shown with their shoulder-board insignia
+  and how many officers held each. Beside it, an **honours board** cut to the
+  shape of a shoulder board, with every name on the roll rising slowly in
+  gold under year headings. Any touch begins.
+- **Home** ("The staff room"): three folders: The Directing Staff (with the
+  number on the staff each year), and the Senior and Junior Course Chief
+  Instructors (with the serving Chief Instructor and the length of the line).
+- **The Directing Staff**: a slate sidebar to choose how to look, and the
+  officers as index cards (rank insignia, initials and surname, specialty,
+  tour, and Serving / CI / RAF / GAF marks) that scroll up and down:
+  - **By year**: a bar for every year since 1976; tap or sweep a finger
+    along it. The tall bar is how many were on the staff that year, the dark
+    bar how many joined. Choose *Joined in* or *On the staff in*.
+  - **By name**: tap the first letter of a surname.
   - **By branch**: Aircrew, Engineering, Communications, Air Traffic & Met,
     Intelligence, Logistics & Finance, Administration, Medical, and the
     allied air forces (Royal Air Force and Ghana Air Force).
   - **Serving now**: the officers on the staff today.
-- **Officer record**: tap a card for the full record: roll number, rank,
-  service number, specialty, tour, duration and air force; any Chief
-  Instructor appointment the officer later held (tap to go to it); and the
-  others who joined in the same month. Previous/next (or swipe) step through
-  the cards that were on screen.
-- **Chief Instructors · Senior Course** and **· Junior Course**: a spotlight
-  and a board of flight strips. The spotlight shows one Chief Instructor
-  (place in the line, rank braid, tenure, duration, predecessor and
-  successor) and moves on every 8 seconds, with a progress bar. Where the
-  officer was earlier on the Directing Staff, a chip opens that record; where
-  they were Chief Instructor of the other course too, a chip goes there. The
-  strips list the whole line; tap one to bring it into the spotlight. A touch
-  holds the spotlight for 15 seconds. Timings are at the top of `script.js`.
+- **Personnel file**: tap a card and the officer's file slides in from the
+  right: roll number, service number, rank insignia, specialty, air force,
+  tour and duration; any Chief Instructor appointment they later held (tap to
+  go to it); and the others who joined in the same month. Previous/next (or
+  swipe) step through the cards that were on screen.
+- **Chief Instructors · Senior Course** and **· Junior Course**: the line of
+  succession as a chain of numbered links across the screen, with the decades
+  beneath. Below it, the selected Chief Instructor: insignia, place in the
+  line, tenure and duration, a link to their own tour on the Directing Staff,
+  to their appointment on the other course if they held both, and to their
+  predecessor and successor. The line moves on by itself every 9 seconds (a
+  bar fills along the current link); a touch holds it for 20 seconds. Timings
+  are at the top of `script.js`.
 
 After 100 seconds without a touch the kiosk returns to the welcome screen.
 
@@ -110,23 +112,43 @@ their end dates show as "To be confirmed". The last Junior Course entry, Gp
 Capt TA Ezekiel (from 24 Feb 2025, no end), is taken as the serving Chief
 Instructor.
 
+## Rank insignia
+
+`assets/ranks/` holds the Nigerian Air Force officer shoulder boards as shown
+on Wikipedia's [Military ranks of Nigeria](https://en.wikipedia.org/wiki/Military_ranks_of_Nigeria)
+page (Squadron Leader, Wing Commander, Group Captain, Air Commodore). They are
+by Skjoldbro, via Wikimedia Commons, licensed
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); see
+`assets/ranks/README.txt`. Each rank's image is set in `ranks` in
+`data/content.js`.
+
 ## Background music
 
-`assets/audio/ambient.mp3` plays on a loop (the same bed as the other AFCSC
-kiosks): softly on the welcome screen, louder once a visitor begins. The
+`assets/audio/ambient.mp3` is "Trench Warning Pulse" (thriller underscore,
+short preview) by openmindaudio, from Pixabay, under the Pixabay Content
+License. The file as supplied is in `source/audio/`; the app's copy has its
+end crossfaded into its start so the 15-second loop runs without a seam. It
+plays softly on the welcome screen and louder once a visitor begins; the
 speaker button in the top bar mutes it. Delete the file for silence.
+
+## Fonts
+
+Source Serif 4, Barlow Condensed and IBM Plex Mono (SIL Open Font License,
+from Google Fonts) are bundled in `assets/fonts/` so the kiosk needs no
+internet access.
 
 ## Structure
 
 ```
 index.html            markup for every screen
 styles.css            theme and layout
-script.js             navigation, movements board, staff views, spotlight, idle reset
-data/content.js       on-screen text, ranks, air forces, branches
+script.js             navigation, honours board, staff views, files, line of succession, idle reset
+data/content.js       on-screen text, ranks and their insignia, air forces, branches
 data/roll.js          the Directing Staff and Chief Instructors (built from source/)
 tools/build_roll.py   rebuilds data/roll.js from the spreadsheets
-source/               the spreadsheets as supplied
-assets/fonts/         bundled Oswald, Playfair Display, Crimson Text
+source/               the spreadsheets and the music as supplied
+assets/ranks/         rank insignia (shoulder boards)
+assets/fonts/         bundled Source Serif 4, Barlow Condensed, IBM Plex Mono
 assets/icons/         AFCSC and Air Force crests, app icon
 assets/audio/         background music
 run.bat, prepare.bat  kiosk launchers

@@ -9,26 +9,19 @@
   var IDLE_TIMEOUT_MS = 100000; // 100 s without a touch -> back to the welcome screen
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  // The card track drifts slowly on its own, pauses while a visitor browses,
-  // and resumes after a quiet spell, bouncing between the two ends.
-  var AUTO_SCROLL_SPEED = 0.45;          // px per frame (~27 px/s)
-  var AUTO_SCROLL_START_DELAY = 2200;    // ms before the drift begins, and at each end
-  var AUTO_SCROLL_RESUME_DELAY = 10000;  // ms of quiet before it resumes
-  var AUTO_SCROLL_END_EPSILON = 2;
+  // Welcome: speed the honours board rises at, in px per second.
+  var HONOURS_SPEED = 26;
 
-  // The welcome board flips one row over to the next officer this often.
-  var BOARD_ROWS = 9, BOARD_FLIP_MS = 1500;
-
-  // Chief Instructors: the spotlight moves on by itself; a touch holds it.
-  var SPOT_INTERVAL = 8000;   // ms each Chief Instructor stays in the spotlight
-  var SPOT_RESUME = 15000;    // ms of quiet before it starts moving again
+  // Chief Instructors: the line moves on by itself; a touch holds it.
+  var CI_INTERVAL = 9000;   // ms each Chief Instructor is shown
+  var CI_RESUME = 20000;    // ms of quiet before it starts moving again
 
   var C = DAW_CONTENT, R = DAW_ROLL;
   var STAFF = R.staff;
   var COURSES = { senior: R.seniorCourse, junior: R.juniorCourse };
 
   var state = {
-    screen: 'attract', course: 'senior', spot: { senior: 0, junior: 0 },
+    screen: 'attract', course: 'senior', ci: { senior: 0, junior: 0 },
     mode: 'year', year: null, yearScope: 'in', letter: null, branch: 'aircrew',
     record: null, recordList: null
   };
@@ -48,6 +41,12 @@
     if (text !== undefined && text !== null) n.textContent = text;
     return n;
   }
+  function img(src, alt, cls) {
+    var i = document.createElement('img');
+    i.src = src; i.alt = alt || ''; i.draggable = false;
+    if (cls) i.className = cls;
+    return i;
+  }
   function restartAnimation(node, cls) {
     node.classList.remove('enter-next', 'enter-prev');
     void node.offsetWidth;
@@ -61,8 +60,8 @@
     var p = iso.split('-');
     return { y: +p[0], m: p[1] ? +p[1] : null, d: p[2] ? +p[2] : null };
   }
-  function todayParts() { var n = new Date(); return { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() }; }
-  var TODAY = todayParts();
+  var NOW = new Date();
+  var TODAY = { y: NOW.getFullYear(), m: NOW.getMonth() + 1, d: NOW.getDate() };
   var TODAY_ISO = TODAY.y + '-' + pad2(TODAY.m) + '-' + pad2(TODAY.d);
 
   function fmtLong(iso) {
@@ -73,7 +72,6 @@
     return p.d + ' ' + MONTHS[p.m - 1] + ' ' + p.y;
   }
   function yearOf(iso) { return iso ? +iso.slice(0, 4) : null; }
-
   function isServing(p) { return !!p.current || (p.to && p.to >= TODAY_ISO); }
   function endIso(p) { return p.to || (p.current ? TODAY_ISO : null); }
   // Last year an officer was on the staff; the start year if the end is not recorded.
@@ -81,23 +79,21 @@
 
   function tenureLong(p) {
     if (!p.from) return t('tbc');
-    var end = p.to ? fmtLong(p.to) : (p.current ? t('present') : t('tbc'));
-    return fmtLong(p.from) + ' — ' + end;
+    return fmtLong(p.from) + ' — ' + (p.to ? fmtLong(p.to) : (p.current ? t('present') : t('tbc')));
   }
   function tenureYears(p) {
     if (!p.from) return t('tbc');
     var a = yearOf(p.from);
     if (!p.to && !p.current) return 'From ' + a;
     var b = p.to ? yearOf(p.to) : t('present');
-    return a === b ? String(a) : a + ' — ' + b;
+    return a === b ? String(a) : a + '–' + b;
   }
   // Duration, to the precision both dates allow.
   function durationOf(p) {
     var a = parts(p.from), b = parts(endIso(p));
     if (!a || !b) return t('tbc');
     if (a.m && b.m) {
-      var months = (b.y - a.y) * 12 + (b.m - a.m);
-      var days = 0;
+      var months = (b.y - a.y) * 12 + (b.m - a.m), days = 0;
       if (a.d && b.d) {
         days = b.d - a.d;
         if (days < 0) { months--; days += new Date(b.y, b.m - 1, 0).getDate(); }
@@ -112,31 +108,32 @@
     return years > 0 ? 'About ' + plural(years, 'year') : 'Under a year';
   }
 
-  function rankFull(r) { return C.ranks[r] || r; }
+  function rankInfo(r) { return C.ranks[r] || { name: r, plural: r, insignia: null }; }
+  function rankFull(r) { return rankInfo(r).name; }
+  function insignia(r) { return rankInfo(r).insignia; }
   function nameOf(p) { return (p.initials ? p.initials + ' ' : '') + p.surname; }
   function shortName(p) { return p.rank + ' ' + nameOf(p); }
   function letterOf(p) { return p.surname.charAt(0).toUpperCase(); }
-  function serviceShort(p) { return p.service && C.services[p.service] ? C.services[p.service].short : null; }
   function staffByNo(no) { return STAFF[no - 1]; }
   function courseLabel(c) { return c === 'senior' ? t('seniorCourse') : t('juniorCourse'); }
+  function isAllied(p) { return p.service === 'raf' || p.service === 'gaf'; }
+  function countLabel(n) { return n === 1 ? t('officer') : t('officers'); }
 
-  // Rank braid as worn on the shoulder board.
-  var BRAID = { 'Sqn Ldr': ['', 'thin', ''], 'Wg Cdr': ['', '', ''], 'Gp Capt': ['', '', '', ''], 'Air Cdre': ['wide'] };
-  function braid(rank, large) {
-    var b = make('span', 'braid' + (large ? ' braid--lg' : ''));
-    (BRAID[rank] || []).forEach(function (k) { b.appendChild(make('i', k)); });
-    b.setAttribute('aria-label', rankFull(rank));
-    return b;
+  function nameInto(node, p) {
+    node.innerHTML = '';
+    if (p.initials) node.appendChild(make('small', null, p.initials));
+    node.appendChild(document.createTextNode(p.surname));
   }
-
-  function chipContent(mono, label, name) {
-    var frag = document.createDocumentFragment();
-    frag.appendChild(make('span', 'chip-thumb', mono));
-    var text = make('span', 'chip-text');
-    text.appendChild(make('span', 'chip-label', label));
-    text.appendChild(make('span', 'chip-name', name));
-    frag.appendChild(text);
-    return frag;
+  // A reference card: a small mark, a label and a name.
+  function ref(mark, label, name, gold, onTap) {
+    var b = make('button', 'ref' + (gold ? ' ref--gold' : ''));
+    b.appendChild(make('span', 'ref-mark', mark));
+    var tx = make('span', 'ref-text');
+    tx.appendChild(make('span', 'ref-label', label));
+    tx.appendChild(make('span', 'ref-name', name));
+    b.appendChild(tx);
+    b.addEventListener('click', onTap);
+    return b;
   }
 
   function byDate(a, b) { return (a.from || '').localeCompare(b.from || '') || a.no - b.no; }
@@ -147,10 +144,6 @@
     var s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
     el.stage.style.transform = 'scale(' + s + ')';
   }
-  function currentScale() {
-    var m = /scale\(([\d.]+)\)/.exec(el.stage.style.transform);
-    return m ? parseFloat(m[1]) : 1;
-  }
   function applyStaticI18n() {
     document.querySelectorAll('[data-i18n]').forEach(function (n) { n.textContent = t(n.getAttribute('data-i18n')); });
   }
@@ -159,7 +152,7 @@
   // Plays assets/audio/ambient.mp3 on a loop: softly on the welcome screen,
   // a little louder once a visitor begins. A missing file means silence.
   var AMBIENT_SRC = 'assets/audio/ambient.mp3';
-  var AMBIENT_VOLUME = 0.35, AMBIENT_ATTRACT_VOLUME = 0.18, AMBIENT_FADE_MS = 1200;
+  var AMBIENT_VOLUME = 0.3, AMBIENT_ATTRACT_VOLUME = 0.15, AMBIENT_FADE_MS = 1200;
   var ambient = null, ambientMuted = false, ambientFadeRaf = null;
 
   function ambientTarget() { return ambientMuted ? 0 : (state.screen === 'attract' ? AMBIENT_ATTRACT_VOLUME : AMBIENT_VOLUME); }
@@ -202,10 +195,9 @@
   /* ---------------- navigation ---------------- */
   // "senior" and "junior" share the Chief Instructors screen.
   function showScreen(id) {
-    closeRecord();
-    stopSpot();
-    stopBoard();
-    staffTrack.stop();
+    closeRecord(true);
+    stopCi();
+    stopHonours();
     var screenId = id;
     if (id === 'senior' || id === 'junior') { state.course = id; screenId = 'chiefs'; }
     state.screen = screenId;
@@ -214,259 +206,180 @@
     el.topbar.classList.toggle('hidden', screenId === 'attract');
     var section = screenId === 'chiefs' ? state.course : screenId;
     el.topbarNav.querySelectorAll('[data-nav]').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-nav') === section); });
-    if (screenId === 'attract') startBoard();
-    if (screenId === 'staff') staffTrack.enter();
+    if (screenId === 'attract') startHonours();
+    if (screenId === 'staff') el.cards.scrollTop = 0;
     if (screenId === 'chiefs') enterChiefs();
     resetIdleTimer();
   }
 
-  /* ---------------- welcome: movements board ---------------- */
-  var boardTimer = null, clockTimer = null, boardQueue = [], boardNext = 0, boardRow = 0;
+  /* ---------------- welcome: honours board ---------------- */
+  var honoursRaf = null, honoursPos = 0, honoursLast = null, honoursHalf = 0;
+  var FIRST_YEAR, LAST_YEAR, YEARS = [];
 
-  function shuffled(list) {
-    var a = list.slice(), seed = 20261106;
-    for (var i = a.length - 1; i > 0; i--) {
-      seed = (seed * 9301 + 49297) % 233280;
-      var j = Math.floor(seed / 233280 * (i + 1));
-      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  function buildHonours() {
+    // the whole roll in order of posting, a year heading before each new year; twice, for a seamless loop
+    var sorted = STAFF.slice().sort(byDate);
+    for (var rep = 0; rep < 2; rep++) {
+      var lastY = null;
+      sorted.forEach(function (p) {
+        var y = yearOf(p.from);
+        if (y !== lastY) { el.honoursRoll.appendChild(make('div', 'hr-year', String(y))); lastY = y; }
+        var row = make('div', 'hr-name');
+        row.appendChild(document.createTextNode(nameOf(p)));
+        row.appendChild(make('small', null, p.rank));
+        el.honoursRoll.appendChild(row);
+      });
     }
-    return a;
   }
-  function branchLabel(p) {
-    if (p.service === 'raf' || p.service === 'gaf') return C.services[p.service].name.replace(' Air Force', ' AF');
-    return p.specialty || '—';
+  function startHonours() {
+    stopHonours();
+    honoursHalf = el.honoursRoll.scrollHeight / 2;
+    honoursLast = null;
+    function step(now) {
+      if (honoursLast !== null) {
+        honoursPos += (now - honoursLast) / 1000 * HONOURS_SPEED;
+        if (honoursHalf && honoursPos >= honoursHalf) honoursPos -= honoursHalf;
+        el.honoursRoll.style.transform = 'translateY(' + (-honoursPos) + 'px)';
+      }
+      honoursLast = now;
+      honoursRaf = requestAnimationFrame(step);
+    }
+    honoursRaf = requestAnimationFrame(step);
   }
-  function fillBoardRow(row, p) {
-    row.innerHTML = '';
-    row.appendChild(make('span', 'b-tour', tenureYears(p).replace(' — ', '–').replace(t('present'), 'NOW')));
-    row.appendChild(make('span', 'b-rank', p.rank));
-    row.appendChild(make('span', 'b-name', nameOf(p)));
-    row.appendChild(make('span', 'b-branch', branchLabel(p)));
-    var serving = isServing(p), allied = p.service === 'raf' || p.service === 'gaf';
-    row.appendChild(make('span', 'b-status' + (serving ? ' is-serving' : (allied ? ' is-allied' : '')),
-      serving ? 'On staff' : (allied ? 'Allied' : 'Completed')));
-  }
+  function stopHonours() { if (honoursRaf) { cancelAnimationFrame(honoursRaf); honoursRaf = null; } }
+
   function buildAttract() {
-    boardQueue = shuffled(STAFF);
-    for (var i = 0; i < BOARD_ROWS; i++) {
-      var row = make('div', 'board-row');
-      fillBoardRow(row, boardQueue[i]);
-      el.boardRows.appendChild(row);
-    }
-    boardNext = BOARD_ROWS;
+    buildHonours();
+    el.welcomeSub.innerHTML = '';
+    el.welcomeSub.appendChild(make('b', null, String(STAFF.length)));
+    el.welcomeSub.appendChild(document.createTextNode(' ' + t('directingStaff') + ' since ' + FIRST_YEAR + ' · '));
+    el.welcomeSub.appendChild(make('b', null, String(R.seniorCourse.length + R.juniorCourse.length)));
+    el.welcomeSub.appendChild(document.createTextNode(' Chief Instructor tours'));
 
-    var serving = STAFF.filter(isServing).length;
-    el.boardFoot.innerHTML = '';
-    var a = make('span'); a.appendChild(make('b', null, String(STAFF.length))); a.appendChild(document.createTextNode(' ' + t('directingStaff') + ' on the roll'));
-    var b = make('span'); b.appendChild(make('b', null, String(serving))); b.appendChild(document.createTextNode(' ' + t('modeServing').toLowerCase()));
-    el.boardFoot.appendChild(a); el.boardFoot.appendChild(b);
-
-    var first = Math.min.apply(null, STAFF.map(function (p) { return yearOf(p.from) || 9999; }));
-    var forces = {};
-    STAFF.forEach(function (p) { if (p.service) forces[p.service] = 1; });
-    [
-      [STAFF.length, t('directingStaff')],
-      [R.seniorCourse.length + R.juniorCourse.length, 'Chief Instructor tours'],
-      [first, 'Since'],
-      [Object.keys(forces).length, 'Air forces']
-    ].forEach(function (s) {
-      var g = make('div', 'gauge');
-      g.appendChild(make('b', null, String(s[0])));
-      g.appendChild(make('span', null, s[1]));
-      el.attractStats.appendChild(g);
+    // the ranks held on posting, junior to senior, with how many officers
+    var counts = {};
+    STAFF.forEach(function (p) { counts[p.rank] = (counts[p.rank] || 0) + 1; });
+    Object.keys(C.ranks).forEach(function (r) {
+      if (!counts[r]) return;
+      var item = make('div', 'parade-item');
+      item.appendChild(img(insignia(r), rankFull(r)));
+      var tx = make('div', 'parade-text');
+      tx.appendChild(make('b', null, String(counts[r])));
+      tx.appendChild(make('span', null, rankInfo(r).plural));
+      item.appendChild(tx);
+      el.parade.appendChild(item);
     });
-  }
-  function tickClock() {
-    var n = new Date();
-    el.boardClock.textContent = pad2(n.getHours()) + ':' + pad2(n.getMinutes()) + ':' + pad2(n.getSeconds());
-  }
-  function flipBoard() {
-    var row = el.boardRows.children[boardRow];
-    fillBoardRow(row, boardQueue[boardNext % boardQueue.length]);
-    row.classList.remove('flip'); void row.offsetWidth; row.classList.add('flip');
-    boardNext++;
-    boardRow = (boardRow + 1) % BOARD_ROWS;
-  }
-  function startBoard() {
-    stopBoard();
-    tickClock();
-    clockTimer = setInterval(tickClock, 1000);
-    boardTimer = setInterval(flipBoard, BOARD_FLIP_MS);
-  }
-  function stopBoard() {
-    if (boardTimer) { clearInterval(boardTimer); boardTimer = null; }
-    if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
   }
 
   /* ---------------- home ---------------- */
-  var YEARS = [];   // every year from the first posting to this one
-  var FIRST_YEAR, LAST_YEAR;
-
   function arrivalsIn(y) { return STAFF.filter(function (p) { return yearOf(p.from) === y; }); }
   function onStaffIn(y) { return STAFF.filter(function (p) { return p.from && yearOf(p.from) <= y && endYear(p) >= y; }); }
 
   function buildHome() {
     var max = 1;
-    var counts = YEARS.map(function (y) { var n = arrivalsIn(y).length; max = Math.max(max, n); return n; });
-    var sky = make('span', 'home-skyline');
+    var counts = YEARS.map(function (y) { var n = onStaffIn(y).length; max = Math.max(max, n); return n; });
+    el.homeStaffArt.appendChild(make('span', 'fa-label', t('onStaffIn') + ' each year'));
+    var bars = make('span', 'fa-bars');
     counts.forEach(function (n, i) {
-      var bar = make('i', YEARS[i] === LAST_YEAR ? 'is-now' : '');
-      bar.style.height = (n / max * 100) + '%';
-      sky.appendChild(bar);
+      var b = make('i', YEARS[i] === LAST_YEAR ? 'is-now' : '');
+      b.style.height = (n / max * 100) + '%';
+      bars.appendChild(b);
     });
-    el.homeStaffArt.appendChild(sky);
-    var axis = make('span', 'home-skyline-axis');
+    el.homeStaffArt.appendChild(bars);
+    var axis = make('span', 'fa-axis');
     [FIRST_YEAR, Math.round((FIRST_YEAR + LAST_YEAR) / 2), LAST_YEAR].forEach(function (y) { axis.appendChild(make('span', null, String(y))); });
     el.homeStaffArt.appendChild(axis);
-    el.homeStaffMeta.textContent = STAFF.length + ' officers · Since ' + FIRST_YEAR;
+    el.homeStaffMeta.textContent = STAFF.length + ' officers · ' + FIRST_YEAR + '–' + LAST_YEAR;
 
     ['senior', 'junior'].forEach(function (c) {
-      var list = COURSES[c], box = make('span', 'home-strips');
-      list.slice(-3).reverse().forEach(function (p) {
-        var s = make('span', 'home-strip' + (isServing(p) ? ' is-now' : ''));
-        s.appendChild(make('b', null, String(p.no)));
-        s.appendChild(make('span', null, shortName(p)));
-        s.appendChild(make('em', null, tenureYears(p)));
-        box.appendChild(s);
-      });
-      el['home' + (c === 'senior' ? 'Senior' : 'Junior') + 'Art'].appendChild(box);
-      el['home' + (c === 'senior' ? 'Senior' : 'Junior') + 'Meta'].textContent =
-        list.length + ' appointments · Since ' + yearOf(list[0].from);
-    });
-  }
-
-  /* ---------------- drifting track ---------------- */
-  var dragMoved = false;
-
-  function Track(node, screenId) {
-    var self = this, timer = null, raf = null, dir = 1, pos = 0;
-    this.stop = function () {
-      if (timer) { clearTimeout(timer); timer = null; }
-      if (raf) { cancelAnimationFrame(raf); raf = null; }
-    };
-    this.schedule = function (delay) {
-      self.stop();
-      timer = setTimeout(function () { timer = null; raf = requestAnimationFrame(step); }, delay);
-    };
-    this.enter = function () {
-      node.scrollLeft = 0; pos = 0; dir = 1;
-      self.schedule(AUTO_SCROLL_START_DELAY);
-    };
-    function step() {
-      var max = node.scrollWidth - node.clientWidth;
-      if (max <= 0) return;
-      if (Math.abs(pos - node.scrollLeft) >= 1) pos = node.scrollLeft;
-      pos = Math.max(0, Math.min(max, pos + AUTO_SCROLL_SPEED * dir));
-      node.scrollLeft = pos;
-      var atEnd = dir > 0 ? pos >= max - AUTO_SCROLL_END_EPSILON : pos <= AUTO_SCROLL_END_EPSILON;
-      if (atEnd) { dir = -dir; self.schedule(AUTO_SCROLL_START_DELAY); return; }
-      raf = requestAnimationFrame(step);
-    }
-
-    // Touch scrolls natively; this adds the same for a mouse.
-    var startX = 0, startLeft = 0, dragging = false;
-    node.addEventListener('pointerdown', function (e) {
-      self.stop(); dragMoved = false;
-      if (e.pointerType !== 'mouse') return;
-      dragging = true; startX = e.clientX; startLeft = node.scrollLeft;
-    });
-    window.addEventListener('pointermove', function (e) {
-      if (!dragging) return;
-      var dx = (e.clientX - startX) / currentScale();
-      if (Math.abs(dx) > 8) dragMoved = true;
-      node.scrollLeft = startLeft - dx;
-    });
-    window.addEventListener('pointerup', function () {
-      dragging = false;
-      if (state.screen === screenId && !state.record) self.schedule(AUTO_SCROLL_RESUME_DELAY);
-    });
-    node.addEventListener('touchmove', function () { dragMoved = true; }, { passive: true });
-    node.addEventListener('wheel', function (e) {
-      self.stop();
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) node.scrollLeft += e.deltaY;
-      self.schedule(AUTO_SCROLL_RESUME_DELAY);
-    }, { passive: true });
-  }
-
-  function buildChips(root, items, active, onPick) {
-    root.innerHTML = '';
-    items.forEach(function (it) {
-      var b = make('button', 'chip' + (it.id === active ? ' active' : ''), it.label);
-      if (it.note !== undefined) b.appendChild(make('small', null, it.note));
-      b.addEventListener('click', function () {
-        Array.prototype.forEach.call(root.children, function (c) { c.classList.toggle('active', c === b); });
-        onPick(it.id);
-      });
-      root.appendChild(b);
+      var list = COURSES[c], key = c === 'senior' ? 'Senior' : 'Junior';
+      var now = list.filter(isServing).pop() || list[list.length - 1];
+      var box = make('span', 'fa-course');
+      box.appendChild(img(insignia(now.rank), rankFull(now.rank)));
+      var tx = make('span', 'fa-course-text');
+      tx.appendChild(make('b', null, String(list.length)));
+      tx.appendChild(make('span', null, 'Appointments since ' + yearOf(list[0].from)));
+      tx.appendChild(make('em', null, shortName(now)));
+      tx.appendChild(make('small', null, (isServing(now) ? 'Serving · ' : 'Latest · ') + tenureYears(now)));
+      box.appendChild(tx);
+      el['home' + key + 'Art'].appendChild(box);
+      el['home' + key + 'Meta'].textContent = list.length + ' appointments · ' + yearOf(list[0].from) + '–' + LAST_YEAR;
     });
   }
 
   /* ---------------- directing staff ---------------- */
-  var staffTrack;
+  var touchMoved = false;
 
   function staffCard(p) {
     var serving = isServing(p);
-    var card = make('button', 'scard' + (serving ? ' scard--serving' : ''));
+    var card = make('button', 'icard' + (serving ? ' icard--serving' : ''));
     card.setAttribute('aria-label', rankFull(p.rank) + ' ' + nameOf(p));
-    var top = make('span', 'scard-top');
-    top.appendChild(braid(p.rank));
-    top.appendChild(make('span', 'scard-rank', p.rank));
-    top.appendChild(make('span', 'scard-no', 'DS ' + p.no));
-    card.appendChild(top);
-    var name = make('span', 'scard-name');
-    if (p.initials) name.appendChild(make('small', null, p.initials));
-    name.appendChild(document.createTextNode(p.surname));
-    card.appendChild(name);
-    card.appendChild(make('span', 'scard-spec', p.specialty || (p.service && p.service !== 'naf' ? C.services[p.service].name : t('specialtyMissing'))));
-    var foot = make('span', 'scard-foot');
-    foot.appendChild(make('span', 'scard-dates', tenureYears(p)));
-    var flags = make('span', 'scard-flags');
-    if (serving) flags.appendChild(make('span', 'mini-tag mini-tag--gold', t('serving')));
-    if (p.chief) flags.appendChild(make('span', 'mini-tag mini-tag--ci', 'CI'));
-    var svc = serviceShort(p);
-    if (svc && p.service !== 'naf') flags.appendChild(make('span', 'mini-tag', svc));
+    var board = make('span', 'icard-board');
+    if (insignia(p.rank)) board.appendChild(img(insignia(p.rank), rankFull(p.rank)));
+    card.appendChild(board);
+    var tx = make('span', 'icard-text');
+    var top = make('span', 'icard-top');
+    top.appendChild(make('b', null, p.rank.toUpperCase()));
+    top.appendChild(make('span', null, 'DS ' + p.no));
+    tx.appendChild(top);
+    var name = make('span', 'icard-name'); nameInto(name, p); tx.appendChild(name);
+    tx.appendChild(make('span', 'icard-spec', p.specialty || (isAllied(p) ? C.services[p.service].name : t('specialtyMissing'))));
+    var foot = make('span', 'icard-foot');
+    foot.appendChild(make('span', 'icard-dates', tenureYears(p)));
+    var flags = make('span', 'icard-flags');
+    if (serving) flags.appendChild(make('span', 'flag flag--serving', t('serving')));
+    if (p.chief) flags.appendChild(make('span', 'flag flag--ci', 'CI'));
+    if (isAllied(p)) flags.appendChild(make('span', 'flag', C.services[p.service].short));
     foot.appendChild(flags);
-    card.appendChild(foot);
+    tx.appendChild(foot);
+    card.appendChild(tx);
     return card;
   }
 
-  function currentStaffList() {
-    var list;
-    if (state.mode === 'year') {
-      list = state.yearScope === 'in' ? arrivalsIn(state.year) : onStaffIn(state.year);
-      return list.sort(byDate);
-    }
+  function branchMembers(id) {
+    if (id === 'allied') return STAFF.filter(isAllied);
+    return STAFF.filter(function (p) { return p.branch === id; });
+  }
+
+  function currentList() {
+    if (state.mode === 'year') return (state.yearScope === 'in' ? arrivalsIn(state.year) : onStaffIn(state.year)).sort(byDate);
     if (state.mode === 'name') return STAFF.filter(function (p) { return letterOf(p) === state.letter; }).sort(byName);
     if (state.mode === 'branch') return branchMembers(state.branch).sort(byDate);
     return STAFF.filter(isServing).sort(byDate);
   }
 
-  function branchMembers(id) {
-    if (id === 'allied') return STAFF.filter(function (p) { return p.service === 'raf' || p.service === 'gaf'; });
-    return STAFF.filter(function (p) { return p.branch === id; });
+  function caption() {
+    if (state.mode === 'year') return state.yearScope === 'in' ? 'joined the Directing Staff in ' + state.year : 'on the Directing Staff in ' + state.year;
+    if (state.mode === 'name') return 'with surnames beginning ' + state.letter;
+    if (state.mode === 'branch') {
+      var br = C.branches.filter(function (b) { return b.id === state.branch; })[0];
+      return 'in ' + br.label + ' · ' + br.note;
+    }
+    return 'serving on the Directing Staff today';
   }
 
   function renderStaff() {
-    var list = currentStaffList();
-    el.staffTrack.innerHTML = '';
-    if (!list.length) {
-      el.staffTrack.appendChild(make('div', 'staff-empty', t('noOne')));
-    } else {
-      var grid = make('div', 'staff-grid');
-      list.forEach(function (p, i) {
-        var card = staffCard(p);
-        card.style.animationDelay = Math.min(i * 0.025, 0.6) + 's';
-        card.addEventListener('click', function () { if (!dragMoved) openRecord(p.no, list); });
-        grid.appendChild(card);
-      });
-      el.staffTrack.appendChild(grid);
-    }
-    if (state.screen === 'staff') staffTrack.enter();
+    var list = currentList();
+    el.deskCount.textContent = String(list.length);
+    el.deskCaption.textContent = countLabel(list.length) + ' ' + caption();
+    el.cards.innerHTML = '';
+    if (!list.length) el.cards.appendChild(make('div', 'cards-empty', t('noOne')));
+    list.forEach(function (p, i) {
+      var card = staffCard(p);
+      card.style.animationDelay = Math.min(i * 0.02, 0.4) + 's';
+      card.addEventListener('click', function () { if (!touchMoved) openRecord(p.no, list); });
+      el.cards.appendChild(card);
+    });
+    el.cards.scrollTop = 0;
   }
 
   function setMode(mode) {
     state.mode = mode;
-    ['year', 'name', 'branch', 'serving'].forEach(function (m) { $('pane-' + m).classList.toggle('hidden', m !== mode); });
+    Array.prototype.forEach.call(el.staffModes.children, function (b) { b.classList.toggle('active', b.getAttribute('data-mode') === mode); });
+    ['year', 'name', 'branch', 'serving'].forEach(function (m) { $('pane-' + m).classList.toggle('active', m === mode); });
+    el.ribbonWrap.classList.toggle('hidden', mode !== 'year');
+    el.yearScope.innerHTML = '';
+    if (mode === 'year') buildScope();
     renderStaff();
   }
 
@@ -474,34 +387,33 @@
   function buildRibbon() {
     var maxOn = 1;
     var data = YEARS.map(function (y) {
-      var on = onStaffIn(y).length, inn = arrivalsIn(y).length;
+      var on = onStaffIn(y).length;
       maxOn = Math.max(maxOn, on);
-      return { y: y, on: on, inn: inn };
+      return { y: y, on: on, inn: arrivalsIn(y).length };
     });
-    el.ribbonCols = [];
-    data.forEach(function (d) {
-      // label every fifth year, and the first and last unless a fifth year is next to them
-      var tick = d.y % 5 === 0 || ((d.y === FIRST_YEAR || d.y === LAST_YEAR) && d.y % 5 > 1 && d.y % 5 < 4);
+    el.ribbonCols = data.map(function (d) {
+      var tick = d.y % 5 === 0;
       var col = make('div', 'ryear' + (tick ? ' is-tick' : ''));
       var bars = make('div', 'ryear-bars');
       var on = make('span', 'ryear-on'); on.style.height = (d.on / maxOn * 100) + '%';
       var inn = make('span', 'ryear-in'); inn.style.height = (d.inn / maxOn * 100) + '%';
       bars.appendChild(on); bars.appendChild(inn);
       col.appendChild(bars);
-      col.appendChild(make('div', 'ryear-label', String(d.y)));
+      var lab = make('div', 'ryear-label', String(d.y));
+      lab.setAttribute('data-year', String(d.y));
+      col.appendChild(lab);
       el.ribbon.appendChild(col);
-      el.ribbonCols.push(col);
+      return col;
     });
 
     var sweeping = false;
     function pick(e) {
       var r = el.ribbon.getBoundingClientRect();
-      var k = Math.floor((e.clientX - r.left) / r.width * YEARS.length);
-      k = Math.max(0, Math.min(YEARS.length - 1, k));
+      var k = Math.max(0, Math.min(YEARS.length - 1, Math.floor((e.clientX - r.left) / r.width * YEARS.length)));
       if (YEARS[k] !== state.year) setYear(YEARS[k]);
     }
     el.ribbon.addEventListener('pointerdown', function (e) {
-      sweeping = true; staffTrack.stop();
+      sweeping = true;
       try { el.ribbon.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
       pick(e);
     });
@@ -509,14 +421,21 @@
     ['pointerup', 'pointercancel'].forEach(function (ev) { el.ribbon.addEventListener(ev, function () { sweeping = false; }); });
   }
 
+  function buildScope() {
+    el.yearScope.innerHTML = '';
+    [['in', t('joinedIn') + ' ' + state.year, arrivalsIn(state.year).length],
+     ['on', t('onStaffIn') + ' ' + state.year, onStaffIn(state.year).length]].forEach(function (s) {
+      var b = make('button', s[0] === state.yearScope ? 'active' : '', s[1]);
+      b.appendChild(make('small', null, String(s[2])));
+      b.addEventListener('click', function () { state.yearScope = s[0]; buildScope(); renderStaff(); });
+      el.yearScope.appendChild(b);
+    });
+  }
+
   function setYear(y) {
     state.year = y;
     el.ribbonCols.forEach(function (c, i) { c.classList.toggle('is-active', YEARS[i] === y); });
-    el.ribbonYear.textContent = String(y);
-    buildChips(el.yearScope, [
-      { id: 'in', label: t('joinedIn') + ' ' + y, note: String(arrivalsIn(y).length) },
-      { id: 'on', label: t('onStaffIn') + ' ' + y, note: String(onStaffIn(y).length) }
-    ], state.yearScope, function (id) { state.yearScope = id; renderStaff(); });
+    buildScope();
     renderStaff();
   }
 
@@ -525,10 +444,10 @@
     STAFF.forEach(function (p) { var l = letterOf(p); counts[l] = (counts[l] || 0) + 1; });
     for (var c = 65; c <= 90; c++) {
       (function (L) {
-        var b = make('button', 'letter', L);
+        if (!state.letter && counts[L]) state.letter = L;
+        var b = make('button', 'letter' + (L === state.letter ? ' active' : ''), L);
         b.appendChild(make('small', null, counts[L] ? String(counts[L]) : '—'));
         b.disabled = !counts[L];
-        if (!state.letter && counts[L]) state.letter = L;
         b.addEventListener('click', function () {
           state.letter = L;
           Array.prototype.forEach.call(el.letters.children, function (n) { n.classList.toggle('active', n === b); });
@@ -537,7 +456,6 @@
         el.letters.appendChild(b);
       })(String.fromCharCode(c));
     }
-    Array.prototype.forEach.call(el.letters.children, function (n) { n.classList.toggle('active', n.firstChild.nodeValue === state.letter); });
   }
 
   function buildBranches() {
@@ -545,9 +463,8 @@
       var n = branchMembers(br.id).length;
       if (!n) return;
       var b = make('button', 'branch' + (br.id === state.branch ? ' active' : ''));
-      b.appendChild(make('b', null, String(n)));
       b.appendChild(make('span', null, br.label));
-      b.appendChild(make('em', null, br.note));
+      b.appendChild(make('b', null, String(n)));
       b.addEventListener('click', function () {
         state.branch = br.id;
         Array.prototype.forEach.call(el.branches.children, function (x) { x.classList.toggle('active', x === b); });
@@ -558,93 +475,94 @@
   }
 
   function buildStaff() {
-    el.staffYears.textContent = FIRST_YEAR + ' — ' + t('present') + ' · ' + STAFF.length + ' officers';
-    staffTrack = new Track(el.staffTrack, 'staff');
-
-    var serving = STAFF.filter(isServing);
-    buildChips(el.staffModes, [
-      { id: 'year', label: t('modeYear') },
-      { id: 'name', label: t('modeName') },
-      { id: 'branch', label: t('modeBranch') },
-      { id: 'serving', label: t('modeServing'), note: String(serving.length) }
-    ], state.mode, setMode);
-
-    el.servingLine.innerHTML = '';
-    el.servingLine.appendChild(make('b', null, String(serving.length)));
-    el.servingLine.appendChild(document.createTextNode('officers are on the Directing Staff of the Department today'));
-
+    el.staffYears.textContent = FIRST_YEAR + '–' + LAST_YEAR + ' · ' + STAFF.length + ' officers';
+    [['year', t('modeYear'), null], ['name', t('modeName'), null], ['branch', t('modeBranch'), null],
+     ['serving', t('modeServing'), STAFF.filter(isServing).length]].forEach(function (m) {
+      var b = make('button', 'mode', m[1]);
+      b.setAttribute('data-mode', m[0]);
+      if (m[2] !== null) b.appendChild(make('small', null, String(m[2])));
+      b.addEventListener('click', function () { setMode(m[0]); });
+      el.staffModes.appendChild(b);
+    });
     buildRibbon();
     buildLetters();
     buildBranches();
     // open on the first year with a real intake (not a lone early posting)
-    var opening = YEARS.filter(function (y) { return arrivalsIn(y).length >= 3; })[0] || YEARS[0];
-    setYear(opening);
+    state.year = YEARS.filter(function (y) { return arrivalsIn(y).length >= 3; })[0] || YEARS[0];
+    el.ribbonCols.forEach(function (c, i) { c.classList.toggle('is-active', YEARS[i] === state.year); });
+    setMode('year');
+
+    el.cards.addEventListener('pointerdown', function () { touchMoved = false; });
+    el.cards.addEventListener('touchmove', function () { touchMoved = true; }, { passive: true });
+    // a mouse can drag the cards too
+    var dragY = null, startTop = 0;
+    el.cards.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse') { dragY = e.clientY; startTop = el.cards.scrollTop; } });
+    window.addEventListener('pointermove', function (e) {
+      if (dragY === null) return;
+      var dy = e.clientY - dragY;
+      if (Math.abs(dy) > 8) touchMoved = true;
+      el.cards.scrollTop = startTop - dy;
+    });
+    window.addEventListener('pointerup', function () { dragY = null; });
   }
 
-  /* ---------------- record of one officer ---------------- */
+  /* ---------------- personnel file (one officer) ---------------- */
   function openRecord(no, list, direction) {
     var p = staffByNo(no);
     if (!p) return;
+    var wasOpen = !!state.record;
     state.record = no;
     state.recordList = list && list.length ? list : [p];
-    staffTrack.stop();
-    stopSpot();
+    stopCi();
 
-    el.recordNo.textContent = String(p.no);
-    el.recordOf.textContent = t('of') + ' ' + STAFF.length + ' ' + t('directingStaff');
-    el.recordBoard.innerHTML = '';
-    el.recordBoard.appendChild(braid(p.rank, true));
+    el.recordRef.textContent = 'DS ' + pad2(p.no) + ' / ' + STAFF.length + (p.svcNo ? '   ·   ' + p.svcNo : '');
+    el.recordInsignia.src = insignia(p.rank) || '';
+    el.recordInsignia.alt = rankFull(p.rank);
     el.recordRankFull.textContent = rankFull(p.rank);
 
     el.recordTags.innerHTML = '';
-    if (isServing(p)) el.recordTags.appendChild(make('span', 'tag tag--current', t('serving')));
-    if (p.service && p.service !== 'naf') el.recordTags.appendChild(make('span', 'tag tag--gold', C.services[p.service].name));
-    if (p.branch) {
-      var br = C.branches.filter(function (b) { return b.id === p.branch; })[0];
-      if (br) el.recordTags.appendChild(make('span', 'tag', br.label));
-    }
+    if (isServing(p)) el.recordTags.appendChild(make('span', 'badge badge--serving', t('serving')));
+    if (isAllied(p)) el.recordTags.appendChild(make('span', 'badge badge--gold', C.services[p.service].name));
+    var br = C.branches.filter(function (b) { return b.id === p.branch; })[0];
+    if (br) el.recordTags.appendChild(make('span', 'badge', br.label));
 
-    el.recordName.innerHTML = '';
-    if (p.initials) el.recordName.appendChild(make('small', null, p.initials));
-    el.recordName.appendChild(document.createTextNode(p.surname));
+    nameInto(el.recordName, p);
 
     el.recordFacts.innerHTML = '';
     [
       [t('rank'), rankFull(p.rank)],
       [t('serviceNo'), p.svcNo],
       [t('specialty'), p.specialty],
-      [t('tour'), tenureLong(p)],
-      [t('duration'), durationOf(p)],
-      [t('service'), p.service ? C.services[p.service].name : null]
+      [t('service'), p.service ? C.services[p.service].name : null],
+      [t('tour'), tenureLong(p), true],
+      [t('duration'), durationOf(p), true]
     ].forEach(function (f) {
-      var d = make('div');
+      var d = make('div', f[2] ? 'is-wide' : null);
       d.appendChild(make('dt', null, f[0]));
       d.appendChild(make('dd', f[1] ? null : 'is-missing', f[1] || t('notRecorded')));
       el.recordFacts.appendChild(d);
     });
 
     el.recordLinks.innerHTML = '';
-    (p.chief || []).forEach(function (ref) {
-      var ci = COURSES[ref.course][ref.no - 1];
-      var b = make('button', 'chip-btn chip-btn--gold');
-      b.appendChild(chipContent(String(ci.no), t('alsoChief') + ' · ' + courseLabel(ref.course), shortName(ci) + ' · ' + tenureYears(ci)));
-      b.addEventListener('click', function () { showChief(ref.course, ref.no - 1); });
-      el.recordLinks.appendChild(b);
+    (p.chief || []).forEach(function (r) {
+      var ci = COURSES[r.course][r.no - 1];
+      el.recordLinks.appendChild(ref(pad2(ci.no), t('alsoChief') + ' · ' + courseLabel(r.course),
+        shortName(ci) + ' · ' + tenureYears(ci), true, function () { showChief(r.course, r.no - 1); }));
     });
 
     // others posted in the same month (only where the month is recorded)
     el.recordIntake.innerHTML = '';
     if (p.from && p.from.length >= 7) {
       var month = p.from.slice(0, 7);
-      var mates = STAFF.filter(function (q) { return q !== p && q.from && q.from.slice(0, 7) === month; }).sort(byDate).slice(0, 10);
+      var mates = STAFF.filter(function (q) { return q !== p && q.from && q.from.slice(0, 7) === month; }).sort(byDate).slice(0, 12);
       if (mates.length) {
-        el.recordIntake.appendChild(make('span', 'record-intake-label', t('sameIntake') + ' · ' + fmtLong(month)));
-        var row = make('div', 'record-intake-list');
+        el.recordIntake.appendChild(make('span', 'file-intake-label', t('sameIntake') + ' · ' + fmtLong(month)));
+        var row = make('div', 'file-intake-list');
         mates.forEach(function (q) {
           var b = make('button', 'mate');
           b.appendChild(make('small', null, q.rank));
           b.appendChild(document.createTextNode(nameOf(q)));
-          b.addEventListener('click', function () { openRecord(q.no, mates.concat([p]).sort(byDate)); });
+          b.addEventListener('click', function () { openRecord(q.no, mates.concat([p]).sort(byDate), 1); });
           row.appendChild(b);
         });
         el.recordIntake.appendChild(row);
@@ -652,152 +570,141 @@
     }
 
     var k = state.recordList.indexOf(p);
+    el.recordPos.textContent = k >= 0 ? (k + 1) + ' of ' + state.recordList.length : '';
     el.recordPrev.disabled = k <= 0;
     el.recordNext.disabled = k < 0 || k >= state.recordList.length - 1;
 
     el.record.classList.remove('hidden');
-    restartAnimation(el.recordCard, direction ? (direction < 0 ? 'enter-prev' : 'enter-next') : null);
+    if (wasOpen) restartAnimation(el.recordCard, direction ? (direction < 0 ? 'enter-prev' : 'enter-next') : 'enter-next');
     resetIdleTimer();
   }
-
   function stepRecord(dir) {
     if (!state.record) return;
     var list = state.recordList, k = list.indexOf(staffByNo(state.record)) + dir;
     if (k >= 0 && k < list.length) openRecord(list[k].no, list, dir);
   }
-
-  function closeRecord() {
+  function closeRecord(silent) {
     if (!state.record) return;
     state.record = null;
     el.record.classList.add('hidden');
-    if (state.screen === 'staff') staffTrack.schedule(AUTO_SCROLL_RESUME_DELAY);
-    if (state.screen === 'chiefs') holdSpot();
+    el.recordCard.classList.remove('enter-next', 'enter-prev');
+    if (!silent && state.screen === 'chiefs') holdCi();
   }
 
-  /* ---------------- chief instructors: spotlight + strips ---------------- */
-  var spotTimer = null;
-
+  /* ---------------- chief instructors: line of succession ---------------- */
+  var ciTimer = null;
   function chiefList() { return COURSES[state.course]; }
 
-  function buildStrips() {
+  function buildChain() {
     var list = chiefList();
-    el.strips.innerHTML = '';
-    el.strips.style.gridTemplateRows = 'repeat(' + Math.ceil(list.length / 2) + ', 1fr)';
-    el.stripNodes = list.map(function (p, i) {
-      var s = make('button', 'strip' + (isServing(p) ? ' is-current' : ''));
-      s.setAttribute('aria-label', rankFull(p.rank) + ' ' + nameOf(p));
-      s.appendChild(make('b', null, pad2(p.no)));
-      s.appendChild(make('span', null, shortName(p)));
-      s.appendChild(make('em', null, tenureYears(p)));
-      s.addEventListener('click', function () { showChief(state.course, i); });
-      el.strips.appendChild(s);
-      return s;
+    el.chain.innerHTML = '';
+    el.chainAxis.innerHTML = '';
+    el.links = list.map(function (p, i) {
+      var b = make('button', 'link' + (isServing(p) ? ' is-serving' : ''), String(p.no));
+      b.setAttribute('aria-label', ordinal(p.no) + ' ' + t('chiefInstructor') + ': ' + shortName(p));
+      b.appendChild(make('span', 'link-progress'));
+      b.addEventListener('click', function () { showChief(state.course, i); });
+      el.chain.appendChild(b);
+      return b;
+    });
+    // a year mark under the first appointment of each decade
+    var seen = {}, lastAt = -99;
+    list.forEach(function (p, i) {
+      var dec = Math.floor(yearOf(p.from) / 10) * 10;
+      if (seen[dec]) return;
+      seen[dec] = true;
+      if (i - lastAt < 3) return;   // too close to the previous label to read
+      lastAt = i;
+      var s = make('span', null, i === 0 ? String(yearOf(p.from)) : dec + 's');
+      s.style.left = ((i + 0.5) / list.length * 100) + '%';
+      el.chainAxis.appendChild(s);
     });
   }
 
-  function renderSpot(i, direction, auto) {
+  function renderChief(i, direction, auto) {
     var list = chiefList(), p = list[i];
-    state.spot[state.course] = i;
+    state.ci[state.course] = i;
 
-    el.plateLabel.textContent = courseLabel(state.course);
-    var ord = ordinal(p.no);
-    el.plateNo.innerHTML = '';
-    el.plateNo.appendChild(document.createTextNode(String(p.no)));
-    el.plateNo.appendChild(make('sup', null, ord.slice(-2)));
-    el.plateBoard.innerHTML = '';
-    el.plateBoard.appendChild(braid(p.rank, true));
-    el.plateOrdinal.textContent = t('chiefInstructor');
-
+    el.ciInsignia.src = insignia(p.rank) || '';
+    el.ciInsignia.alt = rankFull(p.rank);
+    el.ciOrdinal.textContent = ordinal(p.no) + ' ' + t('chiefInstructor') + ' · ' + courseLabel(state.course);
     var serving = isServing(p);
-    el.spotTag.textContent = serving ? t('serving') : courseLabel(state.course);
-    el.spotTag.className = 'tag' + (serving ? ' tag--current' : (state.course === 'senior' ? ' tag--gold' : ''));
-    el.spotRank.textContent = rankFull(p.rank);
-    el.spotName.innerHTML = '';
-    if (p.initials) el.spotName.appendChild(make('small', null, p.initials));
-    el.spotName.appendChild(document.createTextNode(p.surname));
-    el.spotTenure.textContent = tenureLong(p);
-    el.spotDuration.textContent = durationOf(p);
+    el.ciTag.textContent = serving ? t('serving') : '';
+    el.ciTag.className = 'badge' + (serving ? ' badge--serving' : '');
+    el.ciRank.textContent = rankFull(p.rank);
+    nameInto(el.ciName, p);
+    el.ciTenure.textContent = tenureLong(p);
+    el.ciDuration.textContent = durationOf(p);
 
-    el.spotLinks.innerHTML = '';
+    el.ciLinks.innerHTML = '';
     if (p.staff) {
       var ds = staffByNo(p.staff);
-      var b = make('button', 'chip-btn chip-btn--gold');
-      b.appendChild(chipContent('DS', t('asStaff') + ' · ' + tenureYears(ds), shortName(ds) + (ds.specialty ? ' · ' + ds.specialty : '')));
-      b.addEventListener('click', function () { openRecord(ds.no, [ds]); });
-      el.spotLinks.appendChild(b);
+      el.ciLinks.appendChild(ref('DS', t('asStaff') + ' · ' + tenureYears(ds), shortName(ds) + (ds.specialty ? ' · ' + ds.specialty : ''), true,
+        function () { openRecord(ds.no, [ds]); }));
       // the same officer as Chief Instructor of the other course
-      (ds.chief || []).forEach(function (ref) {
-        if (ref.course === state.course) return;
-        var other = COURSES[ref.course][ref.no - 1];
-        var c = make('button', 'chip-btn');
-        c.appendChild(chipContent(String(other.no), t('chiefInstructor') + ' · ' + courseLabel(ref.course), tenureYears(other)));
-        c.addEventListener('click', function () { showChief(ref.course, ref.no - 1); });
-        el.spotLinks.appendChild(c);
+      (ds.chief || []).forEach(function (r) {
+        if (r.course === state.course) return;
+        var other = COURSES[r.course][r.no - 1];
+        el.ciLinks.appendChild(ref(pad2(other.no), t('chiefInstructor') + ' · ' + courseLabel(r.course), tenureYears(other), false,
+          function () { showChief(r.course, r.no - 1); }));
       });
     }
-    var row = make('div', 'spot-links-row');
-    if (i > 0) row.appendChild(successionChip(i - 1, t('precededBy'), -1));
-    if (i < list.length - 1) row.appendChild(successionChip(i + 1, t('succeededBy'), 1));
-    el.spotLinks.appendChild(row);
 
-    el.spotCount.innerHTML = '';
-    el.spotCount.appendChild(document.createTextNode(t('chiefInstructor') + ' '));
-    el.spotCount.appendChild(make('b', null, String(i + 1)));
-    el.spotCount.appendChild(document.createTextNode(' ' + t('of') + ' ' + list.length));
-    el.spotPrev.disabled = i === 0;
-    el.spotNext.disabled = i === list.length - 1;
+    el.ciNeighbours.innerHTML = '';
+    if (i > 0) el.ciNeighbours.appendChild(ref(pad2(list[i - 1].no), t('precededBy') + ' · ' + tenureYears(list[i - 1]), shortName(list[i - 1]), false,
+      function () { showChief(state.course, i - 1, -1); }));
+    if (i < list.length - 1) el.ciNeighbours.appendChild(ref(pad2(list[i + 1].no), t('succeededBy') + ' · ' + tenureYears(list[i + 1]), shortName(list[i + 1]), false,
+      function () { showChief(state.course, i + 1, 1); }));
 
-    el.stripNodes.forEach(function (s, k) { s.classList.toggle('is-active', k === i); });
-    restartAnimation(el.spotCard, direction ? (direction < 0 ? 'enter-prev' : 'enter-next') : null);
+    el.ciCount.innerHTML = '';
+    el.ciCount.appendChild(make('b', null, String(i + 1)));
+    el.ciCount.appendChild(document.createTextNode(' ' + t('of') + ' ' + list.length));
+    el.ciPrev.disabled = i === 0;
+    el.ciNext.disabled = i === list.length - 1;
 
-    el.spotProgress.classList.remove('run');
-    void el.spotProgress.offsetWidth;
-    if (auto) { el.spotProgress.style.animationDuration = SPOT_INTERVAL + 'ms'; el.spotProgress.classList.add('run'); }
+    el.links.forEach(function (b, k) {
+      b.classList.toggle('is-active', k === i);
+      var bar = b.lastChild;
+      bar.classList.remove('run');
+      if (k === i && auto) { void bar.offsetWidth; bar.style.animationDuration = CI_INTERVAL + 'ms'; bar.classList.add('run'); }
+    });
+    restartAnimation(el.ciBody, direction ? (direction < 0 ? 'enter-prev' : 'enter-next') : null);
   }
 
-  function successionChip(i, label, dir) {
-    var p = chiefList()[i];
-    var b = make('button', 'chip-btn');
-    b.appendChild(chipContent(String(p.no), label, shortName(p)));
-    b.addEventListener('click', function () { showChief(state.course, i, dir); });
-    return b;
-  }
-
-  function scheduleSpot(delay) {
-    stopSpot();
-    spotTimer = setTimeout(function () {
-      spotTimer = null;
-      renderSpot((state.spot[state.course] + 1) % chiefList().length, 1, true);
-      scheduleSpot(SPOT_INTERVAL);
+  function scheduleCi(delay) {
+    stopCi();
+    ciTimer = setTimeout(function () {
+      ciTimer = null;
+      renderChief((state.ci[state.course] + 1) % chiefList().length, 1, true);
+      scheduleCi(CI_INTERVAL);
     }, delay);
   }
-  function stopSpot() { if (spotTimer) { clearTimeout(spotTimer); spotTimer = null; } }
-  function holdSpot() {
-    el.spotProgress.classList.remove('run');
-    scheduleSpot(SPOT_RESUME);
+  function stopCi() { if (ciTimer) { clearTimeout(ciTimer); ciTimer = null; } }
+  function holdCi() {
+    if (el.links) el.links.forEach(function (b) { b.lastChild.classList.remove('run'); });
+    scheduleCi(CI_RESUME);
   }
 
   function enterChiefs() {
-    var list = chiefList();
+    var list = chiefList(), last = list[list.length - 1];
     el.ciTitle.textContent = state.course === 'senior' ? t('seniorTitle') : t('juniorTitle');
-    var last = list[list.length - 1];
-    el.ciYears.textContent = yearOf(list[0].from) + ' — ' + (isServing(last) ? t('present') : endYear(last)) + ' · ' + list.length + ' appointments';
-    buildStrips();
-    renderSpot(state.spot[state.course] || 0, null, true);
-    scheduleSpot(SPOT_INTERVAL);
+    el.ciYears.textContent = yearOf(list[0].from) + '–' + (isServing(last) ? t('present') : endYear(last)) + ' · ' + list.length + ' appointments';
+    buildChain();
+    renderChief(state.ci[state.course] || 0, null, true);
+    scheduleCi(CI_INTERVAL);
   }
 
-  // Shows a Chief Instructor in the spotlight at a visitor's request (holds the auto-advance).
+  // Shows a Chief Instructor at a visitor's request (holds the auto-advance).
   function showChief(course, i, direction) {
     var list = COURSES[course];
     if (i < 0 || i >= list.length) return;
-    closeRecord();
+    closeRecord(true);
     if (state.screen !== 'chiefs' || state.course !== course) {
-      state.spot[course] = i;
+      state.ci[course] = i;
       showScreen(course);
     }
-    renderSpot(i, direction || (i >= state.spot[course] ? 1 : -1), false);
-    holdSpot();
+    renderChief(i, direction || (i >= state.ci[course] ? 1 : -1), false);
+    holdCi();
     resetIdleTimer();
   }
 
@@ -807,9 +714,9 @@
     node.addEventListener('pointerdown', function (e) { x0 = e.clientX; y0 = e.clientY; });
     node.addEventListener('pointerup', function (e) {
       if (x0 === null) return;
-      var dx = (e.clientX - x0) / currentScale(), dy = (e.clientY - y0) / currentScale();
+      var dx = e.clientX - x0, dy = e.clientY - y0;
       x0 = null;
-      if (Math.abs(dx) > 90 && Math.abs(dx) > Math.abs(dy) * 1.5) onSwipe(dx < 0 ? 1 : -1);
+      if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) onSwipe(dx < 0 ? 1 : -1);
     });
   }
 
@@ -826,29 +733,27 @@
 
   /* ---------------- init ---------------- */
   function init() {
-    el.stage = $('stage');
-    el.topbar = $('topbar');
+    ['stage', 'topbar', 'parade', 'record', 'strips'].forEach(function (id) { el[id] = $(id); });
     el.topbarNav = $('topbar-nav');
     el.screens = { attract: $('screen-attract'), home: $('screen-home'), staff: $('screen-staff'), chiefs: $('screen-chiefs') };
-    el.boardRows = $('board-rows'); el.boardClock = $('board-clock'); el.boardFoot = $('board-foot'); el.attractStats = $('attract-stats');
+    el.honoursRoll = $('honours-roll'); el.welcomeSub = $('welcome-sub');
     el.homeStaffArt = $('home-staff-art'); el.homeStaffMeta = $('home-staff-meta');
     el.homeSeniorArt = $('home-senior-art'); el.homeSeniorMeta = $('home-senior-meta');
     el.homeJuniorArt = $('home-junior-art'); el.homeJuniorMeta = $('home-junior-meta');
-    el.staffYears = $('staff-years'); el.staffModes = $('staff-modes'); el.staffTrack = $('staff-track');
-    el.ribbon = $('ribbon'); el.ribbonYear = $('ribbon-year'); el.yearScope = $('year-scope');
-    el.letters = $('letters'); el.branches = $('branches'); el.servingLine = $('serving-line');
-    el.ciYears = $('ci-years'); el.ciTitle = $('ci-title'); el.strips = $('strips');
-    el.spotCard = $('spot-card'); el.plateNo = $('plate-no'); el.plateLabel = $('plate-label');
-    el.plateBoard = $('plate-board'); el.plateOrdinal = $('plate-ordinal'); el.spotProgress = $('spot-progress');
-    el.spotTag = $('spot-tag'); el.spotRank = $('spot-rank'); el.spotName = $('spot-name');
-    el.spotTenure = $('spot-tenure'); el.spotDuration = $('spot-duration'); el.spotLinks = $('spot-links');
-    el.spotCount = $('spot-count'); el.spotPrev = $('spot-prev'); el.spotNext = $('spot-next');
-    el.record = $('record'); el.recordCard = $('record-card'); el.recordNo = $('record-no'); el.recordOf = $('record-of');
-    el.recordBoard = $('record-board'); el.recordRankFull = $('record-rank-full'); el.recordTags = $('record-tags');
-    el.recordName = $('record-name'); el.recordFacts = $('record-facts'); el.recordLinks = $('record-links');
-    el.recordIntake = $('record-intake'); el.recordPrev = $('record-prev'); el.recordNext = $('record-next');
-    el.idleOverlay = $('idle-overlay');
-    el.btnSound = $('btn-sound');
+    el.staffYears = $('staff-years'); el.staffModes = $('staff-modes');
+    el.letters = $('letters'); el.branches = $('branches');
+    el.ribbonWrap = $('ribbon-wrap'); el.ribbon = $('ribbon'); el.yearScope = $('year-scope');
+    el.deskCount = $('desk-count'); el.deskCaption = $('desk-caption'); el.cards = $('staff-cards');
+    el.ciYears = $('ci-years'); el.ciTitle = $('ci-title'); el.chain = $('chain'); el.chainAxis = $('chain-axis');
+    el.ciBody = $('ci-body'); el.ciInsignia = $('ci-insignia'); el.ciOrdinal = $('ci-ordinal'); el.ciTag = $('ci-tag');
+    el.ciRank = $('ci-rank'); el.ciName = $('ci-name'); el.ciTenure = $('ci-tenure'); el.ciDuration = $('ci-duration');
+    el.ciLinks = $('ci-links'); el.ciNeighbours = $('ci-neighbours'); el.ciCount = $('ci-count');
+    el.ciPrev = $('ci-prev'); el.ciNext = $('ci-next');
+    el.recordCard = $('record-card'); el.recordRef = $('record-ref'); el.recordInsignia = $('record-insignia');
+    el.recordRankFull = $('record-rank-full'); el.recordTags = $('record-tags'); el.recordName = $('record-name');
+    el.recordFacts = $('record-facts'); el.recordLinks = $('record-links'); el.recordIntake = $('record-intake');
+    el.recordPos = $('record-pos'); el.recordPrev = $('record-prev'); el.recordNext = $('record-next');
+    el.idleOverlay = $('idle-overlay'); el.btnSound = $('btn-sound');
 
     FIRST_YEAR = Math.min.apply(null, STAFF.map(function (p) { return yearOf(p.from) || 9999; }));
     LAST_YEAR = Math.max(TODAY.y, Math.max.apply(null, STAFF.map(function (p) { return yearOf(p.from) || 0; })));
@@ -860,19 +765,18 @@
     buildStaff();
 
     el.screens.attract.addEventListener('click', function () { showScreen('home'); });
-    $('btn-home').addEventListener('click', function () { showScreen('home'); });
     $('btn-close').addEventListener('click', function () { window.close(); });
     el.btnSound.addEventListener('click', toggleAmbient);
     document.querySelectorAll('[data-nav]').forEach(function (b) {
       b.addEventListener('click', function () { showScreen(b.getAttribute('data-nav')); });
     });
 
-    el.spotPrev.addEventListener('click', function () { showChief(state.course, state.spot[state.course] - 1, -1); });
-    el.spotNext.addEventListener('click', function () { showChief(state.course, state.spot[state.course] + 1, 1); });
-    addSwipe(el.spotCard, function (dir) { showChief(state.course, state.spot[state.course] + dir, dir); });
-    el.screens.chiefs.addEventListener('pointerdown', function () { if (state.screen === 'chiefs' && !state.record) holdSpot(); });
+    el.ciPrev.addEventListener('click', function () { showChief(state.course, state.ci[state.course] - 1, -1); });
+    el.ciNext.addEventListener('click', function () { showChief(state.course, state.ci[state.course] + 1, 1); });
+    addSwipe(el.ciBody, function (dir) { showChief(state.course, state.ci[state.course] + dir, dir); });
+    el.screens.chiefs.addEventListener('pointerdown', function () { if (state.screen === 'chiefs' && !state.record) holdCi(); });
 
-    $('record-close').addEventListener('click', closeRecord);
+    $('record-close').addEventListener('click', function () { closeRecord(); });
     el.record.addEventListener('click', function (e) { if (e.target === el.record) closeRecord(); });
     el.recordPrev.addEventListener('click', function () { stepRecord(-1); });
     el.recordNext.addEventListener('click', function () { stepRecord(1); });
@@ -884,8 +788,8 @@
         if (e.key === 'ArrowLeft') stepRecord(-1);
         if (e.key === 'ArrowRight') stepRecord(1);
       } else if (state.screen === 'chiefs') {
-        if (e.key === 'ArrowLeft') showChief(state.course, state.spot[state.course] - 1, -1);
-        if (e.key === 'ArrowRight') showChief(state.course, state.spot[state.course] + 1, 1);
+        if (e.key === 'ArrowLeft') showChief(state.course, state.ci[state.course] - 1, -1);
+        if (e.key === 'ArrowRight') showChief(state.course, state.ci[state.course] + 1, 1);
       }
     });
 
@@ -895,7 +799,7 @@
     document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     window.addEventListener('resize', scaleStage);
     scaleStage();
-    startBoard();
+    startHonours();
     startAmbient();
   }
 
