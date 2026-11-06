@@ -193,22 +193,25 @@
   }
 
   /* ---------------- navigation ---------------- */
-  // "senior" and "junior" share the Chief Instructors screen.
+  // "chiefs" opens the Chief Instructors at the course last shown;
+  // "senior" and "junior" open it at that course.
   function showScreen(id) {
     closeRecord(true);
     stopCi();
     stopHonours();
     var screenId = id;
     if (id === 'senior' || id === 'junior') { state.course = id; screenId = 'chiefs'; }
+    if (screenId === 'attract') resetSearch();
     state.screen = screenId;
     if (ambient && !ambient.paused) fadeAmbient(ambientTarget());
     Object.keys(el.screens).forEach(function (k) { el.screens[k].classList.toggle('active', k === screenId); });
     el.topbar.classList.toggle('hidden', screenId === 'attract');
-    var section = screenId === 'chiefs' ? state.course : screenId;
+    var section = screenId;
     el.topbarNav.querySelectorAll('[data-nav]').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-nav') === section); });
     if (screenId === 'attract') startHonours();
     if (screenId === 'staff') el.cards.scrollTop = 0;
     if (screenId === 'chiefs') enterChiefs();
+    if (screenId === 'search') renderResults();
     resetIdleTimer();
   }
 
@@ -251,10 +254,10 @@
   function buildAttract() {
     buildHonours();
     el.welcomeSub.innerHTML = '';
-    el.welcomeSub.appendChild(make('b', null, String(STAFF.length)));
-    el.welcomeSub.appendChild(document.createTextNode(' ' + t('directingStaff') + ' since ' + FIRST_YEAR + ' · '));
     el.welcomeSub.appendChild(make('b', null, String(R.seniorCourse.length + R.juniorCourse.length)));
-    el.welcomeSub.appendChild(document.createTextNode(' Chief Instructor tours'));
+    el.welcomeSub.appendChild(document.createTextNode(' Chief Instructor tours · '));
+    el.welcomeSub.appendChild(make('b', null, String(STAFF.length)));
+    el.welcomeSub.appendChild(document.createTextNode(' ' + t('directingStaff') + ' since ' + FIRST_YEAR));
 
     // the ranks held on posting, junior to senior, with how many officers
     var counts = {};
@@ -291,20 +294,27 @@
     el.homeStaffArt.appendChild(axis);
     el.homeStaffMeta.textContent = STAFF.length + ' officers · ' + FIRST_YEAR + '–' + LAST_YEAR;
 
+    // Chief Instructors: one folder, a panel for each course (tap a panel for that course)
+    var total = 0;
     ['senior', 'junior'].forEach(function (c) {
-      var list = COURSES[c], key = c === 'senior' ? 'Senior' : 'Junior';
+      var list = COURSES[c];
+      total += list.length;
       var now = list.filter(isServing).pop() || list[list.length - 1];
       var box = make('span', 'fa-course');
+      box.setAttribute('data-course', c);
       box.appendChild(img(insignia(now.rank), rankFull(now.rank)));
       var tx = make('span', 'fa-course-text');
+      tx.appendChild(make('span', 'fa-course-name', courseLabel(c)));
       tx.appendChild(make('b', null, String(list.length)));
       tx.appendChild(make('span', null, 'Appointments since ' + yearOf(list[0].from)));
       tx.appendChild(make('em', null, shortName(now)));
       tx.appendChild(make('small', null, (isServing(now) ? 'Serving · ' : 'Latest · ') + tenureYears(now)));
       box.appendChild(tx);
-      el['home' + key + 'Art'].appendChild(box);
-      el['home' + key + 'Meta'].textContent = list.length + ' appointments · ' + yearOf(list[0].from) + '–' + LAST_YEAR;
+      box.addEventListener('click', function (e) { e.stopPropagation(); showScreen(c); });
+      el.homeChiefsArt.appendChild(box);
     });
+    el.homeChiefsMeta.textContent = total + ' appointments · ' + t('seniorCourse') + ' and ' + t('juniorCourse');
+    el.homeSearchMeta.textContent = (STAFF.length + total) + ' entries on the rolls';
   }
 
   /* ---------------- directing staff ---------------- */
@@ -687,7 +697,8 @@
 
   function enterChiefs() {
     var list = chiefList(), last = list[list.length - 1];
-    el.ciTitle.textContent = state.course === 'senior' ? t('seniorTitle') : t('juniorTitle');
+    el.ciTitle.textContent = t('chiefsTitle') + ' · ' + courseLabel(state.course);
+    Array.prototype.forEach.call(el.ciSwitch.children, function (b) { b.classList.toggle('active', b.getAttribute('data-course') === state.course); });
     el.ciYears.textContent = yearOf(list[0].from) + '–' + (isServing(last) ? t('present') : endYear(last)) + ' · ' + list.length + ' appointments';
     buildChain();
     renderChief(state.ci[state.course] || 0, null, true);
@@ -706,6 +717,122 @@
     renderChief(i, direction || (i >= state.ci[course] ? 1 : -1), false);
     holdCi();
     resetIdleTimer();
+  }
+
+  /* ---------------- search: name or service number ---------------- */
+  var query = '';
+  var KEY_ROWS = ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL/', 'ZXCVBNM-'];
+  var MAX_STAFF_RESULTS = 60;
+
+  function alnum(x) { return (x || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  function words(p) { return ((p.initials || '') + ' ' + p.surname).toUpperCase().replace(/[’'.]/g, '').split(/[\s-]+/).filter(Boolean); }
+  function svcOf(p) { return p.svcNo || (p.staff ? staffByNo(p.staff).svcNo : null); }
+
+  // Score how well an officer matches the query (0 = no match). Every word
+  // typed must begin one of the officer's names, or appear in the service number.
+  function score(p, q) {
+    var qa = alnum(q);
+    if (!qa) return 0;
+    var svc = alnum(svcOf(p));
+    if (/[0-9]/.test(qa)) {
+      if (!svc) return 0;
+      if (svc === qa || svc.replace(/^[A-Z]+/, '') === qa) return 100;
+      return svc.indexOf(qa) >= 0 || svc.replace(/^[A-Z]+/, '').indexOf(qa) === 0 ? 60 : 0;
+    }
+    var w = words(p), sur = alnum(p.surname), total = 0;
+    var tokens = q.toUpperCase().replace(/[’'.]/g, '').split(/[\s-]+/).filter(Boolean);
+    for (var i = 0; i < tokens.length; i++) {
+      var tk = tokens[i], best = 0;
+      if (alnum(tk) === sur) best = 50;
+      w.forEach(function (x) { if (x === tk) best = Math.max(best, 40); else if (x.indexOf(tk) === 0) best = Math.max(best, 25); });
+      if (!best && tk.length >= 3 && sur.indexOf(alnum(tk)) >= 0) best = 10;
+      if (!best) return 0;
+      total += best;
+    }
+    return total;
+  }
+  function search(list, q) {
+    return list.map(function (p) { return { p: p, s: score(p, q) }; })
+      .filter(function (r) { return r.s > 0; })
+      .sort(function (a, b) { return b.s - a.s || byName(a.p, b.p); })
+      .map(function (r) { return r.p; });
+  }
+
+  function buildKeyboard() {
+    KEY_ROWS.forEach(function (row) {
+      var r = make('div', 'key-row');
+      row.split('').forEach(function (k) {
+        var b = make('button', 'key', k);
+        b.addEventListener('click', function () { typeKey(k); });
+        r.appendChild(b);
+      });
+      el.keyboard.appendChild(r);
+    });
+    var last = make('div', 'key-row');
+    [['space', t('space'), function () { typeKey(' '); }],
+     ['back', '⌫', function () { query = query.slice(0, -1); renderResults(); }],
+     ['clear', t('clear'), function () { query = ''; renderResults(); }]].forEach(function (k) {
+      var b = make('button', 'key key--' + k[0], k[1]);
+      b.addEventListener('click', k[2]);
+      last.appendChild(b);
+    });
+    el.keyboard.appendChild(last);
+  }
+  function typeKey(k) {
+    if (query.length >= 24) return;
+    if (k === ' ' && (!query || / $/.test(query))) return;
+    query += k;
+    renderResults();
+  }
+  function resetSearch() { query = ''; if (el.queryText) renderResults(); }
+
+  function chiefResult(p, course) {
+    var b = ref(pad2(p.no), ordinal(p.no) + ' ' + t('chiefInstructor') + ' · ' + courseLabel(course) + ' · ' + tenureYears(p),
+      shortName(p) + (svcOf(p) ? '  ·  ' + svcOf(p) : ''), true,
+      function () { showChief(course, p.no - 1); });
+    b.classList.add('result-ci');
+    return b;
+  }
+
+  function renderResults() {
+    el.queryText.textContent = query;
+    el.queryPlaceholder.classList.toggle('hidden', !!query);
+    el.resultsHead.innerHTML = '';
+    el.results.innerHTML = '';
+    if (!alnum(query)) {
+      el.results.appendChild(make('p', 'results-note', t('searchStart')));
+      return;
+    }
+    var cis = [];
+    ['senior', 'junior'].forEach(function (c) { search(COURSES[c], query).forEach(function (p) { cis.push({ p: p, c: c }); }); });
+    var ds = search(STAFF, query);
+    var count = make('div', 'desk-count');
+    count.appendChild(make('b', null, String(cis.length + ds.length)));
+    count.appendChild(make('span', null, (cis.length + ds.length === 1 ? 'match' : 'matches') + ' for “' + query.trim() + '”'));
+    el.resultsHead.appendChild(count);
+    if (!cis.length && !ds.length) {
+      el.results.appendChild(make('p', 'results-note', t('searchEmpty') + ' “' + query.trim() + '”.'));
+      return;
+    }
+    if (cis.length) {
+      el.results.appendChild(make('h3', 'results-group', t('chiefsTitle') + ' · ' + cis.length));
+      var ciBox = make('div', 'results-ci');
+      cis.forEach(function (r) { ciBox.appendChild(chiefResult(r.p, r.c)); });
+      el.results.appendChild(ciBox);
+    }
+    if (ds.length) {
+      el.results.appendChild(make('h3', 'results-group', t('directingStaff') + ' · ' + ds.length));
+      var grid = make('div', 'results-ds');
+      var shown = ds.slice(0, MAX_STAFF_RESULTS);
+      shown.forEach(function (p) {
+        var card = staffCard(p);
+        card.addEventListener('click', function () { openRecord(p.no, shown); });
+        grid.appendChild(card);
+      });
+      el.results.appendChild(grid);
+      if (ds.length > shown.length) el.results.appendChild(make('p', 'results-note', 'And ' + (ds.length - shown.length) + ' more: keep typing to narrow the search.'));
+    }
+    el.results.scrollTop = 0;
   }
 
   /* ---------------- swipe ---------------- */
@@ -735,11 +862,13 @@
   function init() {
     ['stage', 'topbar', 'parade', 'record', 'strips'].forEach(function (id) { el[id] = $(id); });
     el.topbarNav = $('topbar-nav');
-    el.screens = { attract: $('screen-attract'), home: $('screen-home'), staff: $('screen-staff'), chiefs: $('screen-chiefs') };
+    el.screens = { attract: $('screen-attract'), home: $('screen-home'), staff: $('screen-staff'), chiefs: $('screen-chiefs'), search: $('screen-search') };
+    el.homeChiefsArt = $('home-chiefs-art'); el.homeChiefsMeta = $('home-chiefs-meta'); el.homeSearchMeta = $('home-search-meta');
+    el.ciSwitch = $('ci-switch');
+    el.keyboard = $('keyboard'); el.queryText = $('query-text'); el.queryPlaceholder = $('query-placeholder');
+    el.resultsHead = $('results-head'); el.results = $('results');
     el.honoursRoll = $('honours-roll'); el.welcomeSub = $('welcome-sub');
     el.homeStaffArt = $('home-staff-art'); el.homeStaffMeta = $('home-staff-meta');
-    el.homeSeniorArt = $('home-senior-art'); el.homeSeniorMeta = $('home-senior-meta');
-    el.homeJuniorArt = $('home-junior-art'); el.homeJuniorMeta = $('home-junior-meta');
     el.staffYears = $('staff-years'); el.staffModes = $('staff-modes');
     el.letters = $('letters'); el.branches = $('branches');
     el.ribbonWrap = $('ribbon-wrap'); el.ribbon = $('ribbon'); el.yearScope = $('year-scope');
@@ -763,6 +892,16 @@
     buildAttract();
     buildHome();
     buildStaff();
+    buildKeyboard();
+    renderResults();
+    Array.prototype.forEach.call(el.ciSwitch.children, function (b) {
+      var c = b.getAttribute('data-course');
+      b.lastChild.textContent = COURSES[c].length + ' appointments';
+      b.addEventListener('click', function () {
+        if (c === state.course) return;
+        stopCi(); state.course = c; enterChiefs();
+      });
+    });
 
     el.screens.attract.addEventListener('click', function () { showScreen('home'); });
     $('btn-close').addEventListener('click', function () { window.close(); });
@@ -787,6 +926,13 @@
         if (e.key === 'Escape') closeRecord();
         if (e.key === 'ArrowLeft') stepRecord(-1);
         if (e.key === 'ArrowRight') stepRecord(1);
+      } else if (state.screen === 'search') {
+        // a physical keyboard types into the search too (without pressing on-screen buttons)
+        if (/^([a-z0-9\/ -]|Backspace|Escape|Enter)$/i.test(e.key)) e.preventDefault();
+        if (/^[a-z0-9\/-]$/i.test(e.key)) typeKey(e.key.toUpperCase());
+        else if (e.key === ' ') typeKey(' ');
+        else if (e.key === 'Backspace') { query = query.slice(0, -1); renderResults(); }
+        else if (e.key === 'Escape') { query = ''; renderResults(); }
       } else if (state.screen === 'chiefs') {
         if (e.key === 'ArrowLeft') showChief(state.course, state.ci[state.course] - 1, -1);
         if (e.key === 'ArrowRight') showChief(state.course, state.ci[state.course] + 1, 1);

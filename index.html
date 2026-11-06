@@ -29,9 +29,9 @@
         </button>
         <nav class="tabs" id="topbar-nav">
           <button class="tab" data-nav="home"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5" /><path d="M5.5 10v9a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-9" /></svg><span data-i18n="navHome"></span></button>
+          <button class="tab" data-nav="chiefs"><span data-i18n="navChiefs"></span></button>
           <button class="tab" data-nav="staff"><span data-i18n="navStaff"></span></button>
-          <button class="tab" data-nav="senior"><span data-i18n="navSenior"></span></button>
-          <button class="tab" data-nav="junior"><span data-i18n="navJunior"></span></button>
+          <button class="tab" data-nav="search"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg><span data-i18n="navSearch"></span></button>
         </nav>
         <div class="topbar-tools">
           <button class="tool-btn sound-btn hidden" id="btn-sound" aria-label="Mute background music" aria-pressed="false">
@@ -96,6 +96,18 @@
             <p class="home-lede" data-i18n="homeLede"></p>
           </div>
           <nav class="folders">
+            <!-- I. Chief Instructors, in two sections: Senior Course and Junior Course -->
+            <div class="folder folder--chiefs" role="button" tabindex="0" data-nav="chiefs">
+              <span class="folder-tab">CI</span>
+              <span class="folder-art folder-art--split" id="home-chiefs-art"></span>
+              <span class="folder-body">
+                <span class="folder-meta" id="home-chiefs-meta"></span>
+                <span class="folder-title" data-i18n="menuChiefs"></span>
+                <span class="folder-sub" data-i18n="menuChiefsSub"></span>
+              </span>
+              <span class="folder-go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+            </div>
+            <!-- II. Directing Staff -->
             <button class="folder" data-nav="staff">
               <span class="folder-tab">DS</span>
               <span class="folder-art" id="home-staff-art"></span>
@@ -106,23 +118,17 @@
               </span>
               <span class="folder-go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
             </button>
-            <button class="folder" data-nav="senior">
-              <span class="folder-tab">SC</span>
-              <span class="folder-art" id="home-senior-art"></span>
-              <span class="folder-body">
-                <span class="folder-meta" id="home-senior-meta"></span>
-                <span class="folder-title" data-i18n="menuSenior"></span>
-                <span class="folder-sub" data-i18n="menuSeniorSub"></span>
+            <!-- III. Search -->
+            <button class="folder folder--search" data-nav="search">
+              <span class="folder-tab"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></span>
+              <span class="folder-art folder-art--search">
+                <span class="fa-search-box"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg><span data-i18n="searchExample"></span></span>
+                <span class="fa-search-keys"><i>A</i><i>B</i><i>C</i><i>1</i><i>2</i><i>3</i><i>/</i></span>
               </span>
-              <span class="folder-go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-            </button>
-            <button class="folder" data-nav="junior">
-              <span class="folder-tab">JC</span>
-              <span class="folder-art" id="home-junior-art"></span>
               <span class="folder-body">
-                <span class="folder-meta" id="home-junior-meta"></span>
-                <span class="folder-title" data-i18n="menuJunior"></span>
-                <span class="folder-sub" data-i18n="menuJuniorSub"></span>
+                <span class="folder-meta" id="home-search-meta"></span>
+                <span class="folder-title" data-i18n="menuSearch"></span>
+                <span class="folder-sub" data-i18n="menuSearchSub"></span>
               </span>
               <span class="folder-go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
             </button>
@@ -162,7 +168,10 @@
               <p class="kicker" id="ci-years"></p>
               <h2 class="ci-title" id="ci-title"></h2>
             </div>
-            <p class="ci-hint" data-i18n="lineHint"></p>
+            <div class="course-switch" id="ci-switch">
+              <button data-course="senior"><b data-i18n="seniorCourse"></b><small id="ci-switch-senior"></small></button>
+              <button data-course="junior"><b data-i18n="juniorCourse"></b><small id="ci-switch-junior"></small></button>
+            </div>
           </div>
 
           <!-- every appointment in order, one link of the chain each -->
@@ -194,6 +203,25 @@
                 <button class="nav-btn" id="ci-next" aria-label="Next Chief Instructor"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
               </div>
             </div>
+          </div>
+        </section>
+
+        <!-- ============ SEARCH: name or service number ============ -->
+        <section class="screen" id="screen-search">
+          <div class="finder">
+            <p class="kicker" data-i18n="appKicker"></p>
+            <h2 class="finder-title" data-i18n="searchTitle"></h2>
+            <p class="finder-hint" data-i18n="searchHint"></p>
+            <div class="query" id="query">
+              <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
+              <span class="query-text" id="query-text"></span><span class="query-caret"></span>
+              <span class="query-placeholder" id="query-placeholder" data-i18n="searchPlaceholder"></span>
+            </div>
+            <div class="keyboard" id="keyboard"></div>
+          </div>
+          <div class="results-wrap">
+            <div class="results-head" id="results-head"></div>
+            <div class="results" id="results"></div>
           </div>
         </section>
 

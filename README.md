@@ -23,9 +23,13 @@ where *Our Leaders* is a night-sky cockpit.
   and how many officers held each. Beside it, an **honours board** cut to the
   shape of a shoulder board, with every name on the roll rising slowly in
   gold under year headings. Any touch begins.
-- **Home** ("The staff room"): three folders: The Directing Staff (with the
-  number on the staff each year), and the Senior and Junior Course Chief
-  Instructors (with the serving Chief Instructor and the length of the line).
+- **Home** ("The staff room"), in the order the client asked for:
+  1. **Chief Instructors**, in two sections, Senior Course and Junior Course
+     (tap a course's panel to open it at that course);
+  2. **The Directing Staff** (with the number on the staff each year);
+  3. **Find an officer** (search).
+  The top bar has the same order: Home, Chief Instructors, Directing Staff,
+  Search.
 - **The Directing Staff**: a slate sidebar to choose how to look, and the
   officers as index cards (rank insignia, initials and surname, specialty,
   tour, and Serving / CI / RAF / GAF marks) that scroll up and down:
@@ -42,14 +46,25 @@ where *Our Leaders* is a night-sky cockpit.
   tour and duration; any Chief Instructor appointment they later held (tap to
   go to it); and the others who joined in the same month. Previous/next (or
   swipe) step through the cards that were on screen.
-- **Chief Instructors · Senior Course** and **· Junior Course**: the line of
-  succession as a chain of numbered links across the screen, with the decades
-  beneath. Below it, the selected Chief Instructor: insignia, place in the
-  line, tenure and duration, a link to their own tour on the Directing Staff,
-  to their appointment on the other course if they held both, and to their
-  predecessor and successor. The line moves on by itself every 9 seconds (a
-  bar fills along the current link); a touch holds it for 20 seconds. Timings
-  are at the top of `script.js`.
+- **Chief Instructors**: a Senior Course / Junior Course switch at the top
+  right, and the line of succession for the chosen course as a chain of
+  numbered links across the screen, with the decades beneath. Below it, the
+  selected Chief Instructor: insignia, place in the line, tenure and duration,
+  a link to their own tour on the Directing Staff, to their appointment on
+  the other course if they held both, and to their predecessor and
+  successor. The line moves on by itself every 9 seconds (a bar fills along
+  the current link); a touch holds it for 20 seconds. Timings are at the top
+  of `script.js`.
+- **Find an officer**: an on-screen keyboard (letters, numbers, `/` and `-`)
+  to search every Chief Instructor and Directing Staff officer by surname,
+  initials (for example "IA Abdul") or service number ("2139", "NAF/2139").
+  Results are grouped as Chief Instructors then Directing Staff; tap one to
+  open it. A physical keyboard also types into the search. The search clears
+  when the kiosk returns to the welcome screen.
+
+The Directing Staff are shown as one combined roll for now: the nominal roll
+does not record which course each officer taught. When that is known, it can
+be added as a column and the roll split into Senior and Junior Course.
 
 After 100 seconds without a touch the kiosk returns to the welcome screen.
 
