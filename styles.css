@@ -198,7 +198,7 @@ svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width:
 .home-head { padding: 58px 0 40px; display: flex; flex-direction: column; gap: 10px; animation: rise .8s var(--ease) both; }
 .home-title { font-family: var(--font-serif); font-weight: 700; font-size: 92px; line-height: 1; letter-spacing: -0.01em; color: var(--ink); }
 .home-lede { font-family: var(--font-serif); font-style: italic; font-size: 30px; color: var(--ink-2); }
-.folders { flex: 1; display: grid; grid-template-columns: 1.45fr 1fr 0.82fr; gap: 40px; padding-top: 34px; }
+.folders { flex: 1; display: grid; grid-template-columns: 1.5fr 0.9fr 1fr 0.8fr; gap: 28px; padding-top: 34px; }
 .folder {
   position: relative; display: flex; flex-direction: column; text-align: left;
   border-radius: 0 16px 16px 16px; background: var(--card); border: 1px solid var(--rule-strong); box-shadow: var(--shadow);
@@ -245,6 +245,22 @@ svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width:
 .folder-art--split .fa-course-text b { font-size: 76px; }
 .folder-art--split .fa-course-text em { font-size: 21px; margin-top: 6px; }
 .fa-course-text .fa-course-name { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: 0.14em; color: #fff; margin-bottom: 4px; }
+
+/* four folders: tighter type */
+.folders .folder-title { font-size: 34px; }
+.folders .folder-meta { font-size: 15px; }
+.folders .folder-sub { font-size: 21px; }
+.folders .folder-body { padding: 22px 26px 26px; padding-right: 92px; }
+.folders .folder-go { right: 22px; bottom: 26px; width: 58px; height: 58px; }
+.folder-art--split .fa-course { padding: 0 14px; gap: 12px; }
+.folder-art--split .fa-course img { width: 64px; height: 148px; }
+.folder-art--split .fa-course-text b { font-size: 64px; }
+.folder-art--split .fa-course-text em { font-size: 19px; }
+.folder-art--split .fa-course-text .fa-course-name { font-size: 19px; }
+.folder--s01 .fa-course { padding: 0 22px; gap: 16px; }
+.folder--s01 .fa-course img { width: 70px; height: 162px; }
+.folder--s01 .fa-course-text b { font-size: 76px; }
+.folder--s01 .fa-course-text em { font-size: 20px; }
 
 /* search folder */
 .folder-tab svg { width: 24px; height: 24px; stroke-width: 2.4; }

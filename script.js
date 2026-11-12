@@ -18,10 +18,11 @@
 
   var C = DAW_CONTENT, R = DAW_ROLL;
   var STAFF = R.staff;
-  var COURSES = { senior: R.seniorCourse, junior: R.juniorCourse };
+  // The lines of succession: the Chief Instructors of each course, and the S01 A7.
+  var COURSES = { senior: R.seniorCourse, junior: R.juniorCourse, s01: DAW_S01 };
 
   var state = {
-    screen: 'attract', course: 'senior', ci: { senior: 0, junior: 0 },
+    screen: 'attract', course: 'senior', ciCourse: 'senior', ci: { senior: 0, junior: 0, s01: 0 },
     mode: 'year', year: null, yearScope: 'in', letter: null, branch: 'aircrew',
     record: null, recordList: null
   };
@@ -115,7 +116,10 @@
   function shortName(p) { return p.rank + ' ' + nameOf(p); }
   function letterOf(p) { return p.surname.charAt(0).toUpperCase(); }
   function staffByNo(no) { return STAFF[no - 1]; }
-  function courseLabel(c) { return c === 'senior' ? t('seniorCourse') : t('juniorCourse'); }
+  function courseLabel(c) { return c === 'senior' ? t('seniorCourse') : c === 'junior' ? t('juniorCourse') : t('s01Title'); }
+  // How an appointment in a line is named: "Chief Instructor · Senior Course" or "S01 A7".
+  function lineLabel(c) { return c === 's01' ? t('s01Title') : t('chiefInstructor') + ' · ' + courseLabel(c); }
+  function roleOf(c) { return c === 's01' ? t('s01Title') : t('chiefInstructor'); }
   function isAllied(p) { return p.service === 'raf' || p.service === 'gaf'; }
   function countLabel(n) { return n === 1 ? t('officer') : t('officers'); }
 
@@ -194,19 +198,22 @@
 
   /* ---------------- navigation ---------------- */
   // "chiefs" opens the Chief Instructors at the course last shown;
-  // "senior" and "junior" open it at that course.
+  // "senior" and "junior" open it at that course; "s01" opens the S01 A7
+  // chronicle on the same line-of-succession screen.
   function showScreen(id) {
     closeRecord(true);
     stopCi();
     stopHonours();
     var screenId = id;
-    if (id === 'senior' || id === 'junior') { state.course = id; screenId = 'chiefs'; }
+    if (id === 'senior' || id === 'junior') { state.course = state.ciCourse = id; screenId = 'chiefs'; }
+    else if (id === 'chiefs') state.course = state.ciCourse;
+    else if (id === 's01') { state.course = 's01'; screenId = 'chiefs'; }
     if (screenId === 'attract') resetSearch();
     state.screen = screenId;
     if (ambient && !ambient.paused) fadeAmbient(ambientTarget());
     Object.keys(el.screens).forEach(function (k) { el.screens[k].classList.toggle('active', k === screenId); });
     el.topbar.classList.toggle('hidden', screenId === 'attract');
-    var section = screenId;
+    var section = screenId === 'chiefs' && state.course === 's01' ? 's01' : screenId;
     el.topbarNav.querySelectorAll('[data-nav]').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-nav') === section); });
     if (screenId === 'attract') startHonours();
     if (screenId === 'staff') el.cards.scrollTop = 0;
@@ -256,6 +263,8 @@
     el.welcomeSub.innerHTML = '';
     el.welcomeSub.appendChild(make('b', null, String(R.seniorCourse.length + R.juniorCourse.length)));
     el.welcomeSub.appendChild(document.createTextNode(' Chief Instructor tours · '));
+    el.welcomeSub.appendChild(make('b', null, String(DAW_S01.length)));
+    el.welcomeSub.appendChild(document.createTextNode(' ' + t('s01Title') + ' · '));
     el.welcomeSub.appendChild(make('b', null, String(STAFF.length)));
     el.welcomeSub.appendChild(document.createTextNode(' ' + t('directingStaff') + ' since ' + FIRST_YEAR));
 
@@ -313,8 +322,20 @@
       box.addEventListener('click', function (e) { e.stopPropagation(); showScreen(c); });
       el.homeChiefsArt.appendChild(box);
     });
-    el.homeChiefsMeta.textContent = total + ' appointments · ' + t('seniorCourse') + ' and ' + t('juniorCourse');
-    el.homeSearchMeta.textContent = (STAFF.length + total) + ' entries on the rolls';
+    el.homeChiefsMeta.textContent = total + ' appointments · two courses';
+    // S01 A7: the serving (or latest) S01 A7 and the length of the chronicle
+    var s01 = DAW_S01, s01Now = s01.filter(isServing).pop() || s01[s01.length - 1];
+    var sb = make('span', 'fa-course');
+    sb.appendChild(img(insignia(s01Now.rank), rankFull(s01Now.rank)));
+    var stx = make('span', 'fa-course-text');
+    stx.appendChild(make('b', null, String(s01.length)));
+    stx.appendChild(make('span', null, 'Appointments'));
+    stx.appendChild(make('em', null, shortName(s01Now)));
+    stx.appendChild(make('small', null, (isServing(s01Now) ? 'Serving · ' : 'Latest · ') + tenureYears(s01Now)));
+    sb.appendChild(stx);
+    el.homeS01Art.appendChild(sb);
+    el.homeS01Meta.textContent = s01.length + ' appointments';
+    el.homeSearchMeta.textContent = (STAFF.length + total + s01.length) + ' entries on the rolls';
   }
 
   /* ---------------- directing staff ---------------- */
@@ -338,7 +359,8 @@
     foot.appendChild(make('span', 'icard-dates', tenureYears(p)));
     var flags = make('span', 'icard-flags');
     if (serving) flags.appendChild(make('span', 'flag flag--serving', t('serving')));
-    if (p.chief) flags.appendChild(make('span', 'flag flag--ci', 'CI'));
+    if ((p.chief || []).some(function (r) { return r.course !== 's01'; })) flags.appendChild(make('span', 'flag flag--ci', 'CI'));
+    if ((p.chief || []).some(function (r) { return r.course === 's01'; })) flags.appendChild(make('span', 'flag flag--ci', 'S01'));
     if (isAllied(p)) flags.appendChild(make('span', 'flag', C.services[p.service].short));
     foot.appendChild(flags);
     tx.appendChild(foot);
@@ -556,7 +578,7 @@
     el.recordLinks.innerHTML = '';
     (p.chief || []).forEach(function (r) {
       var ci = COURSES[r.course][r.no - 1];
-      el.recordLinks.appendChild(ref(pad2(ci.no), t('alsoChief') + ' · ' + courseLabel(r.course),
+      el.recordLinks.appendChild(ref(pad2(ci.no), r.course === 's01' ? t('alsoS01') : t('alsoChief') + ' · ' + courseLabel(r.course),
         shortName(ci) + ' · ' + tenureYears(ci), true, function () { showChief(r.course, r.no - 1); }));
     });
 
@@ -611,21 +633,23 @@
     el.chainAxis.innerHTML = '';
     el.links = list.map(function (p, i) {
       var b = make('button', 'link' + (isServing(p) ? ' is-serving' : ''), String(p.no));
-      b.setAttribute('aria-label', ordinal(p.no) + ' ' + t('chiefInstructor') + ': ' + shortName(p));
+      b.setAttribute('aria-label', ordinal(p.no) + ' ' + roleOf(state.course) + ': ' + shortName(p));
       b.appendChild(make('span', 'link-progress'));
       b.addEventListener('click', function () { showChief(state.course, i); });
       el.chain.appendChild(b);
       return b;
     });
-    // a year mark under the first appointment of each decade
-    var seen = {}, lastAt = -99;
+    // a year mark under the first appointment of each decade (where dates are recorded)
+    var seen = {}, lastAt = -99, firstDated = true;
     list.forEach(function (p, i) {
+      if (!p.from) return;
+      var first = firstDated; firstDated = false;
       var dec = Math.floor(yearOf(p.from) / 10) * 10;
       if (seen[dec]) return;
       seen[dec] = true;
       if (i - lastAt < 3) return;   // too close to the previous label to read
       lastAt = i;
-      var s = make('span', null, i === 0 ? String(yearOf(p.from)) : dec + 's');
+      var s = make('span', null, first ? String(yearOf(p.from)) : dec + 's');
       s.style.left = ((i + 0.5) / list.length * 100) + '%';
       el.chainAxis.appendChild(s);
     });
@@ -637,7 +661,7 @@
 
     el.ciInsignia.src = insignia(p.rank) || '';
     el.ciInsignia.alt = rankFull(p.rank);
-    el.ciOrdinal.textContent = ordinal(p.no) + ' ' + t('chiefInstructor') + ' · ' + courseLabel(state.course);
+    el.ciOrdinal.textContent = ordinal(p.no) + ' ' + lineLabel(state.course);
     var serving = isServing(p);
     el.ciTag.textContent = serving ? t('serving') : '';
     el.ciTag.className = 'badge' + (serving ? ' badge--serving' : '');
@@ -651,11 +675,11 @@
       var ds = staffByNo(p.staff);
       el.ciLinks.appendChild(ref('DS', t('asStaff') + ' · ' + tenureYears(ds), shortName(ds) + (ds.specialty ? ' · ' + ds.specialty : ''), true,
         function () { openRecord(ds.no, [ds]); }));
-      // the same officer as Chief Instructor of the other course
+      // the same officer's other appointments: Chief Instructor of either course, or S01 A7
       (ds.chief || []).forEach(function (r) {
-        if (r.course === state.course) return;
+        if (r.course === state.course && r.no === p.no) return;
         var other = COURSES[r.course][r.no - 1];
-        el.ciLinks.appendChild(ref(pad2(other.no), t('chiefInstructor') + ' · ' + courseLabel(r.course), tenureYears(other), false,
+        el.ciLinks.appendChild(ref(pad2(other.no), lineLabel(r.course), tenureYears(other), false,
           function () { showChief(r.course, r.no - 1); }));
       });
     }
@@ -697,9 +721,15 @@
 
   function enterChiefs() {
     var list = chiefList(), last = list[list.length - 1];
-    el.ciTitle.textContent = t('chiefsTitle') + ' · ' + courseLabel(state.course);
+    var isS01 = state.course === 's01';
+    el.ciTitle.textContent = isS01 ? t('s01Title') : t('chiefsTitle') + ' · ' + courseLabel(state.course);
+    el.ciSwitch.classList.toggle('hidden', isS01);
     Array.prototype.forEach.call(el.ciSwitch.children, function (b) { b.classList.toggle('active', b.getAttribute('data-course') === state.course); });
-    el.ciYears.textContent = yearOf(list[0].from) + '–' + (isServing(last) ? t('present') : endYear(last)) + ' · ' + list.length + ' appointments';
+    var dated = list.filter(function (p) { return p.from; });
+    var until = isServing(last) ? t('present') : endYear(last);
+    el.ciYears.textContent = (isS01 ? t('s01Kicker') + ' · ' : '') +
+      (list[0].from ? yearOf(list[0].from) + '–' + until + ' · ' + list.length + ' appointments'
+                    : list.length + ' appointments' + (dated.length ? ' · dates recorded from ' + yearOf(dated[0].from) : ''));
     buildChain();
     renderChief(state.ci[state.course] || 0, null, true);
     scheduleCi(CI_INTERVAL);
@@ -717,6 +747,26 @@
     renderChief(i, direction || (i >= state.ci[course] ? 1 : -1), false);
     holdCi();
     resetIdleTimer();
+  }
+
+  /* ---------------- S01 A7: link each to their Directing Staff tour ----------------
+     By surname and initials, as tools/build_roll.py does for the Chief
+     Instructors: the same initials, or one set beginning the other ("BOD"
+     for "BO"), or the only officer of that surname with the same first initial. */
+  var SURNAME_ALIASES = { daniels: 'daniel' };
+  function normSurname(x) { var n = x.toLowerCase().replace(/[^a-z]/g, ''); return SURNAME_ALIASES[n] || n; }
+  function linkS01() {
+    DAW_S01.forEach(function (s) {
+      var cands = STAFF.filter(function (p) { return normSurname(p.surname) === normSurname(s.surname); });
+      var a = s.initials || '';
+      var exact = cands.filter(function (p) { return p.initials === a; });
+      var close = cands.filter(function (p) { return p.initials && a && (p.initials.indexOf(a) === 0 || a.indexOf(p.initials) === 0); });
+      var only = cands.length === 1 && cands[0].initials.charAt(0) === a.charAt(0) ? cands : [];
+      var pick = (exact.length ? exact : close.length ? close : only).sort(byDate).pop();
+      if (!pick) return;
+      s.staff = pick.no;
+      (pick.chief = pick.chief || []).push({ course: 's01', no: s.no });
+    });
   }
 
   /* ---------------- search: name or service number ---------------- */
@@ -787,7 +837,7 @@
   function resetSearch() { query = ''; if (el.queryText) renderResults(); }
 
   function chiefResult(p, course) {
-    var b = ref(pad2(p.no), ordinal(p.no) + ' ' + t('chiefInstructor') + ' · ' + courseLabel(course) + ' · ' + tenureYears(p),
+    var b = ref(pad2(p.no), ordinal(p.no) + ' ' + lineLabel(course) + ' · ' + tenureYears(p),
       shortName(p) + (svcOf(p) ? '  ·  ' + svcOf(p) : ''), true,
       function () { showChief(course, p.no - 1); });
     b.classList.add('result-ci');
@@ -805,12 +855,14 @@
     }
     var cis = [];
     ['senior', 'junior'].forEach(function (c) { search(COURSES[c], query).forEach(function (p) { cis.push({ p: p, c: c }); }); });
+    var s01s = search(DAW_S01, query);
     var ds = search(STAFF, query);
+    var found = cis.length + s01s.length + ds.length;
     var count = make('div', 'desk-count');
-    count.appendChild(make('b', null, String(cis.length + ds.length)));
-    count.appendChild(make('span', null, (cis.length + ds.length === 1 ? 'match' : 'matches') + ' for “' + query.trim() + '”'));
+    count.appendChild(make('b', null, String(found)));
+    count.appendChild(make('span', null, (found === 1 ? 'match' : 'matches') + ' for “' + query.trim() + '”'));
     el.resultsHead.appendChild(count);
-    if (!cis.length && !ds.length) {
+    if (!found) {
       el.results.appendChild(make('p', 'results-note', t('searchEmpty') + ' “' + query.trim() + '”.'));
       return;
     }
@@ -819,6 +871,12 @@
       var ciBox = make('div', 'results-ci');
       cis.forEach(function (r) { ciBox.appendChild(chiefResult(r.p, r.c)); });
       el.results.appendChild(ciBox);
+    }
+    if (s01s.length) {
+      el.results.appendChild(make('h3', 'results-group', t('s01Title') + ' · ' + s01s.length));
+      var s01Box = make('div', 'results-ci');
+      s01s.forEach(function (p) { s01Box.appendChild(chiefResult(p, 's01')); });
+      el.results.appendChild(s01Box);
     }
     if (ds.length) {
       el.results.appendChild(make('h3', 'results-group', t('directingStaff') + ' · ' + ds.length));
@@ -863,6 +921,7 @@
     ['stage', 'topbar', 'parade', 'record', 'strips'].forEach(function (id) { el[id] = $(id); });
     el.topbarNav = $('topbar-nav');
     el.screens = { attract: $('screen-attract'), home: $('screen-home'), staff: $('screen-staff'), chiefs: $('screen-chiefs'), search: $('screen-search') };
+    el.homeS01Art = $('home-s01-art'); el.homeS01Meta = $('home-s01-meta');
     el.homeChiefsArt = $('home-chiefs-art'); el.homeChiefsMeta = $('home-chiefs-meta'); el.homeSearchMeta = $('home-search-meta');
     el.ciSwitch = $('ci-switch');
     el.keyboard = $('keyboard'); el.queryText = $('query-text'); el.queryPlaceholder = $('query-placeholder');
@@ -888,6 +947,7 @@
     LAST_YEAR = Math.max(TODAY.y, Math.max.apply(null, STAFF.map(function (p) { return yearOf(p.from) || 0; })));
     for (var y = FIRST_YEAR; y <= LAST_YEAR; y++) YEARS.push(y);
 
+    linkS01();
     applyStaticI18n();
     buildAttract();
     buildHome();
@@ -899,7 +959,7 @@
       b.lastChild.textContent = COURSES[c].length + ' appointments';
       b.addEventListener('click', function () {
         if (c === state.course) return;
-        stopCi(); state.course = c; enterChiefs();
+        stopCi(); state.course = state.ciCourse = c; enterChiefs();
       });
     });
 

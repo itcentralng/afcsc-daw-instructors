@@ -30,6 +30,7 @@
         <nav class="tabs" id="topbar-nav">
           <button class="tab" data-nav="home"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5" /><path d="M5.5 10v9a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-9" /></svg><span data-i18n="navHome"></span></button>
           <button class="tab" data-nav="chiefs"><span data-i18n="navChiefs"></span></button>
+          <button class="tab" data-nav="s01"><span data-i18n="navS01"></span></button>
           <button class="tab" data-nav="staff"><span data-i18n="navStaff"></span></button>
           <button class="tab" data-nav="search"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg><span data-i18n="navSearch"></span></button>
         </nav>
@@ -107,7 +108,18 @@
               </span>
               <span class="folder-go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
             </div>
-            <!-- II. Directing Staff -->
+            <!-- II. S01 A7 -->
+            <button class="folder folder--s01" data-nav="s01">
+              <span class="folder-tab">S01</span>
+              <span class="folder-art" id="home-s01-art"></span>
+              <span class="folder-body">
+                <span class="folder-meta" id="home-s01-meta"></span>
+                <span class="folder-title" data-i18n="menuS01"></span>
+                <span class="folder-sub" data-i18n="menuS01Sub"></span>
+              </span>
+              <span class="folder-go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+            </button>
+            <!-- III. Directing Staff -->
             <button class="folder" data-nav="staff">
               <span class="folder-tab">DS</span>
               <span class="folder-art" id="home-staff-art"></span>
@@ -118,7 +130,7 @@
               </span>
               <span class="folder-go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
             </button>
-            <!-- III. Search -->
+            <!-- IV. Search -->
             <button class="folder folder--search" data-nav="search">
               <span class="folder-tab"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></span>
               <span class="folder-art folder-art--search">
@@ -262,6 +274,7 @@
 
   <script src="data/content.js"></script>
   <script src="data/roll.js"></script>
+  <script src="data/s01.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

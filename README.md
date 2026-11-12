@@ -26,10 +26,11 @@ where *Our Leaders* is a night-sky cockpit.
 - **Home** ("The staff room"), in the order the client asked for:
   1. **Chief Instructors**, in two sections, Senior Course and Junior Course
      (tap a course's panel to open it at that course);
-  2. **The Directing Staff** (with the number on the staff each year);
-  3. **Find an officer** (search).
-  The top bar has the same order: Home, Chief Instructors, Directing Staff,
-  Search.
+  2. **S01 A7** (the serving S01 A7 and the length of the chronicle);
+  3. **The Directing Staff** (with the number on the staff each year);
+  4. **Find an officer** (search).
+  The top bar has the same order: Home, Chief Instructors, S01 A7,
+  Directing Staff, Search.
 - **The Directing Staff**: a slate sidebar to choose how to look, and the
   officers as index cards (rank insignia, initials and surname, specialty,
   tour, and Serving / CI / RAF / GAF marks) that scroll up and down:
@@ -55,10 +56,15 @@ where *Our Leaders* is a night-sky cockpit.
   successor. The line moves on by itself every 9 seconds (a bar fills along
   the current link); a touch holds it for 20 seconds. Timings are at the top
   of `script.js`.
+- **S01 A7**: the chronicle of the Department's S01 A7 (45 appointments) on
+  the same line-of-succession screen as the Chief Instructors, without the
+  course switch. Each S01 A7 links to their tour on the Directing Staff and
+  to any Chief Instructor appointment they held; the Directing Staff record
+  and the Chief Instructor pages link back.
 - **Find an officer**: an on-screen keyboard (letters, numbers, `/` and `-`)
   to search every Chief Instructor and Directing Staff officer by surname,
   initials (for example "IA Abdul") or service number ("2139", "NAF/2139").
-  Results are grouped as Chief Instructors then Directing Staff; tap one to
+  Results are grouped as Chief Instructors, S01 A7, then Directing Staff; tap one to
   open it. A physical keyboard also types into the search. The search clears
   when the kiosk returns to the welcome screen.
 
@@ -89,6 +95,15 @@ For development, open `index.html` in any modern browser.
     still serving; `"to": null` alone shows as "To be confirmed".
   - `service` is `naf`, `raf` or `gaf`; `branch` is one of the branch ids.
   - `chief` (on a DS) and `staff` (on a Chief Instructor) link the two rolls.
+
+- `data/s01.js`: the S01 A7 chronicle, typed from
+  `source/Chronicle of S01 A7.pdf` in its order, one officer per line. The
+  chronicle gives periods only from no. 40 (September 2024); earlier entries
+  show "To be confirmed" until dates are added (`"from": "2019-03"` and so
+  on). Each is linked to the Directing Staff roll by surname and initials when
+  the app starts; 39 of the 45 match. The six that do not (Ogah, Lasisi,
+  Tanko, Naruwa, M Yusuf, TP Odesola) are not on the DS roll under that name;
+  the roll has a "TE Odesola", which may be the same officer.
 
 `data/roll.js` is built from the spreadsheets in `source/`. Either correct it
 by hand, or update the spreadsheets and rebuild it:
@@ -160,8 +175,9 @@ styles.css            theme and layout
 script.js             navigation, honours board, staff views, files, line of succession, idle reset
 data/content.js       on-screen text, ranks and their insignia, air forces, branches
 data/roll.js          the Directing Staff and Chief Instructors (built from source/)
+data/s01.js           the S01 A7 chronicle (typed from source/)
 tools/build_roll.py   rebuilds data/roll.js from the spreadsheets
-source/               the spreadsheets and the music as supplied
+source/               the spreadsheets, the S01 A7 chronicle and the music as supplied
 assets/ranks/         rank insignia (shoulder boards)
 assets/fonts/         bundled Source Serif 4, Barlow Condensed, IBM Plex Mono
 assets/icons/         AFCSC and Air Force crests, app icon
