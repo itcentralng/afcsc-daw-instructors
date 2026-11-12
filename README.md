@@ -161,6 +161,14 @@ end crossfaded into its start so the 15-second loop runs without a seam. It
 plays softly on the welcome screen and louder once a visitor begins; the
 speaker button in the top bar mutes it. Delete the file for silence.
 
+## App icon
+
+`assets/icons/app.ico` is the Nigerian Air Force crest (`assets/icons/naf.png`),
+trimmed, centred on a transparent square and saved at 16, 24, 32, 48, 64, 128
+and 256 px. It is the browser tab icon and the icon of the Desktop shortcut
+that `prepare.bat` creates (run `prepare.bat` again on a kiosk that already has
+the shortcut, to pick up the new icon).
+
 ## Fonts
 
 Source Serif 4, Barlow Condensed and IBM Plex Mono (SIL Open Font License,
@@ -180,7 +188,7 @@ tools/build_roll.py   rebuilds data/roll.js from the spreadsheets
 source/               the spreadsheets, the S01 A7 chronicle and the music as supplied
 assets/ranks/         rank insignia (shoulder boards)
 assets/fonts/         bundled Source Serif 4, Barlow Condensed, IBM Plex Mono
-assets/icons/         AFCSC and Air Force crests, app icon
+assets/icons/         AFCSC and Air Force crests; app.ico, the app icon, made from the Air Force crest
 assets/audio/         background music
 run.bat, prepare.bat  kiosk launchers
 ```
