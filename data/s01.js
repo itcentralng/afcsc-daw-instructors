@@ -5,7 +5,7 @@
    in its order. Edit by hand: one officer per line.
 
    The chronicle gives the period only from no. 40 onwards; "from": null
-   shows as "To be confirmed". "current": true marks the serving S01 A7
+   shows as "-". "current": true marks the serving S01 A7
    (no. 45, from June 2026, no end). Dates are ISO at the precision known
    ("2024-09").
 

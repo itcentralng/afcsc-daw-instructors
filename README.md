@@ -92,14 +92,14 @@ For development, open `index.html` in any modern browser.
   - `seniorCourse`, `juniorCourse`: the Chief Instructors in order.
   - Dates are ISO at the precision known: `"1978"`, `"1991-02"` or
     `"1984-08-06"`. `"to": null` with `"current": true` marks an officer
-    still serving; `"to": null` alone shows as "To be confirmed".
+    still serving; `"to": null` alone shows the start date followed by "-".
   - `service` is `naf`, `raf` or `gaf`; `branch` is one of the branch ids.
   - `chief` (on a DS) and `staff` (on a Chief Instructor) link the two rolls.
 
 - `data/s01.js`: the S01 A7 chronicle, typed from
   `source/Chronicle of S01 A7.pdf` in its order, one officer per line. The
   chronicle gives periods only from no. 40 (September 2024); earlier entries
-  show "To be confirmed" until dates are added (`"from": "2019-03"` and so
+  show "-" until dates are added (`"from": "2019-03"` and so
   on). Each is linked to the Directing Staff roll by surname and initials when
   the app starts; 39 of the 45 match. The six that do not (Ogah, Lasisi,
   Tanko, Naruwa, M Yusuf, TP Odesola) are not on the DS roll under that name;
@@ -138,7 +138,7 @@ A few entries could not be read as typed. They are corrected in `FIXES` in
 Also: misspelt months ("Ju1", "Ju|", "Sun", "0ct", "Fec") are mended, initials
 "Al" are read as "AI", and "lya" as "Iya". Nine DS entries (and three Chief
 Instructors) were turned into dates by Excel, which kept only the start, so
-their end dates show as "To be confirmed". The last Junior Course entry, Gp
+their end dates show as "-". The last Junior Course entry, Gp
 Capt TA Ezekiel (from 24 Feb 2025, no end), is taken as the serving Chief
 Instructor.
 

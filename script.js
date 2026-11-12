@@ -80,7 +80,8 @@
 
   function tenureLong(p) {
     if (!p.from) return t('tbc');
-    return fmtLong(p.from) + ' — ' + (p.to ? fmtLong(p.to) : (p.current ? t('present') : t('tbc')));
+    if (!p.to && !p.current) return fmtLong(p.from) + ' ' + t('tbc');   // end not recorded: "5 June 2006 -"
+    return fmtLong(p.from) + ' — ' + (p.to ? fmtLong(p.to) : t('present'));
   }
   function tenureYears(p) {
     if (!p.from) return t('tbc');

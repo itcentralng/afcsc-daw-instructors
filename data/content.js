@@ -77,7 +77,7 @@ var DAW_CONTENT = {
     of: 'of',
     serving: 'Serving',
     present: 'Present',
-    tbc: 'To be confirmed',
+    tbc: '-',              // shown for a date or duration not recorded
     notRecorded: 'Not recorded',
     specialtyMissing: 'Specialty not recorded',
     precededBy: 'Preceded by',
