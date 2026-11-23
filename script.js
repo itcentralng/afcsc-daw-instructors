@@ -50,7 +50,9 @@
     'ta-ezekiel': 'ezekiel',
     'ia-abdulrahman': 'abdulrahman',
     'ia-abdul-rahman': 'abdulrahman',
-    'fj-ibrahim': 'fj-ibrahim'
+    'fj-ibrahim': 'fj-ibrahim',
+    'de-daniels': 'de-daniels',
+    'm-sani': 'm-sani'
   };
 
   var STAFF_PORTRAITS = {
